@@ -1,0 +1,17 @@
+---
+title: "Final Project Notebook"
+author: "Brian Bacik, Chiu Feng Yap, Joy Yoo, Yi Yao, Yun Qing"
+date: "3/22/2021"
+output: html_document
+---
+
+```{r}
+library(readr)
+demo_train <- read_csv("/Users/chiufengyap/OneDrive - The University of Texas Health Science Center at Houston/Spring 2021/Data Analytics and Prediction/Final Project/Data/demo_train.csv")
+
+medication_train <- read_csv("/Users/chiufengyap/OneDrive - The University of Texas Health Science Center at Houston/Spring 2021/Data Analytics and Prediction/Final Project/Data/medication_train.csv")
+
+procedure_train <- read_csv("/Users/chiufengyap/OneDrive - The University of Texas Health Science Center at Houston/Spring 2021/Data Analytics and Prediction/Final Project/Data/procedure_train.csv")
+
+```
+
