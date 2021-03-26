@@ -72,10 +72,12 @@ procedure_train <- procedure_train %>%
 ```
 
 
+
+
 #### To combine all prediction variables into one dataset, we first:
 
 - add patient's admission date to the medication_train & procedure_train data, then calculate the day difference
-- remove rows from both dataframes that have more than 3 days 
+- remove rows from both dataframes that have more than 3 days
 - combine all the information into the main demo_train dataset that contains patients' demographics
 
 ```{r}
@@ -88,6 +90,8 @@ procedure_train <- demo_train %>%
   select(patient_num, admission_date) %>% 
   right_join(procedure_train)
 ```
+
+
 
 #### Rearranging columns order
 ```{r}
@@ -115,4 +119,11 @@ procedure_train <- procedure_train %>%
   )
 ```
 
+#### Combining all dataframes into one by id and admission date
+```{r}
+joined_df <- demo_train %>% 
+  left_join(medication_train, by = c('patient_num', 'admission_date')) %>% 
+  left_join(procedure_train, by = c('patient_num', 'admission_date')) %>% 
+  select(-procedure_description)
+```
 
