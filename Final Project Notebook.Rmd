@@ -28,25 +28,25 @@ library(lubridate)
 
 ```{r}
 library(readr)
-demo_train <- read_csv("/Users/chiufengyap/OneDrive - The University of Texas Health Science Center at Houston/Spring 2021/Data Analytics and Prediction/Final Project/Data/demo_train.csv")
+demo_train <- read_csv("demo_train.csv")
 
-medication_train <- read_csv("/Users/chiufengyap/OneDrive - The University of Texas Health Science Center at Houston/Spring 2021/Data Analytics and Prediction/Final Project/Data/medication_train.csv")
+medication_train <- read_csv("medication_train.csv")
 
-procedure_train <- read_csv("/Users/chiufengyap/OneDrive - The University of Texas Health Science Center at Houston/Spring 2021/Data Analytics and Prediction/Final Project/Data/procedure_train.csv")
+procedure_train <- read_csv("procedure_train.csv")
 
 ```
 
 #### Viewing top 5 rows for each datasets
 ```{r}
-head(demo_train, n=5)
+# head(demo_train, n=5)
 ```
 
 ```{r}
-head(medication_train, n=5)
+# head(medication_train, n=5)
 ```
 
 ```{r}
-head(procedure_train, n=5)
+# head(procedure_train, n=5)
 ```
 #### Renaming columns 
 ```{r}
@@ -119,11 +119,11 @@ procedure_train <- procedure_train %>%
   )
 ```
 
-#### Combining all dataframes into one by id and admission date
+#### Combining all dataframes into one by id and admission date (WHEN THE SMALLER DATASETS ARE CLEANED)
 ```{r}
-joined_df <- demo_train %>% 
-  left_join(medication_train, by = c('patient_num', 'admission_date')) %>% 
-  left_join(procedure_train, by = c('patient_num', 'admission_date')) %>% 
-  select(-procedure_description)
+# joined_df <- demo_train %>% 
+#   left_join(medication_train, by = c('patient_num', 'admission_date')) %>% 
+#   left_join(procedure_train, by = c('patient_num', 'admission_date')) %>% 
+#   select(-procedure_description)
 ```
 
