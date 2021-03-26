@@ -1,9 +1,30 @@
 ---
 title: "Final Project Notebook"
-author: "Brian Bacik, Chiu Feng Yap, Joy Yoo, Yi Yao, Yun Qing"
-date: "3/22/2021"
+authors: "Brian Bacik, Chiu Feng Yap, Joy Yoo, Yi Yao, Yun Qing"
+date: "3/26/2021"
 output: html_document
 ---
+
+
+### Introduction of the Project
+The goal of this project is to predict in-hospital ‘death’ of Subarachnoid Hemorrhage (SAH) patients using all patients’ records in the first 3 days from the start time of the hospitalization. No information after the first 3 days should be used as variables. Inputs of prediction includes patients’ encounter data, medications, and procedures.  A test set will be given but the outcome will not be included in the dataset provided to students. 
+
+### Outcome
+The primary outcome is mortality; defined as in-hospital death or discharge to hospice care. 
+
+### Task 
+Build a machine-learning model to predict mortality in subarachnoid hemorrhage patients. 
+
+
+####  Importing datasets 
+
+```{r message=FALSE}
+### loading packages
+library(dplyr)
+library(readr)
+library(tidyr)
+library(lubridate)
+```
 
 ```{r}
 library(readr)
@@ -14,4 +35,24 @@ medication_train <- read_csv("/Users/chiufengyap/OneDrive - The University of Te
 procedure_train <- read_csv("/Users/chiufengyap/OneDrive - The University of Texas Health Science Center at Houston/Spring 2021/Data Analytics and Prediction/Final Project/Data/procedure_train.csv")
 
 ```
+
+#### Viewing top 5 rows for each datasets
+```{r}
+head(demo_train, n=5)
+```
+
+```{r}
+head(medication_train, n=5)
+```
+
+```{r}
+head(procedure_train, n=5)
+```
+
+#### To combine all prediction variables into one dataset, we first:
+- add patient's admission date to the medication_train & procedure_train data, then calculate the day difference
+- remove rows from both dataframes that have more than 3 days 
+- combine all the information into the main demo_train dataset that contains patients' demographics
+
+
 
