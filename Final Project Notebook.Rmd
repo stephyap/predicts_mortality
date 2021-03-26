@@ -48,11 +48,45 @@ head(medication_train, n=5)
 ```{r}
 head(procedure_train, n=5)
 ```
+#### Renaming columns 
+```{r}
+demo_train <- demo_train %>% 
+  rename(
+    patient_num = patient_sk,
+    age = age_in_years,
+    admission_date = New_admitted_dt_tm,
+    discharge_date = New_discharge_dt_tm
+  )
+
+medication_train <- medication_train %>% 
+  rename(
+    patient_num = patient_sk,
+    medication_date = med_started_dt_tm
+  )
+
+procedure_train <- procedure_train %>% 
+  rename(
+    patient_num = patient_sk,
+    procedute_date = procedure_dt_tm
+  )
+```
 
 #### To combine all prediction variables into one dataset, we first:
+
 - add patient's admission date to the medication_train & procedure_train data, then calculate the day difference
 - remove rows from both dataframes that have more than 3 days 
 - combine all the information into the main demo_train dataset that contains patients' demographics
+
+```{r}
+medication_train <- demo_train %>% 
+  select(patient_num, admission_date) %>% 
+  right_join(medication_train)
+```
+```{r}
+procedure_train <- demo_train %>% 
+  select(patient_num, admission_date) %>% 
+  right_join(procedure_train)
+```
 
 
 
