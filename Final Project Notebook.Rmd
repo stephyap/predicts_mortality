@@ -67,9 +67,10 @@ medication_train <- medication_train %>%
 procedure_train <- procedure_train %>% 
   rename(
     patient_num = patient_sk,
-    procedute_date = procedure_dt_tm
+    procedure_date = procedure_dt_tm
   )
 ```
+
 
 #### To combine all prediction variables into one dataset, we first:
 
@@ -88,5 +89,30 @@ procedure_train <- demo_train %>%
   right_join(procedure_train)
 ```
 
+#### Rearranging columns order
+```{r}
+# colnames(medication_train)
+medication_train <- medication_train[,c(1,3,2,4)]
+
+# colnames(procedure_train)
+procedure_train <- procedure_train[,c(1,3,4,2,5)]
+```
+
+
+
+#### Calculating the date intervals in days
+```{r}
+medication_train <- medication_train %>% 
+  mutate(
+    med_since_adm = as.numeric(difftime(medication_date, admission_date, units ="days"))
+  )
+```
+
+```{r}
+procedure_train <- procedure_train %>% 
+  mutate(
+    pro_since_adm = as.numeric(difftime(procedure_date, admission_date, units ="days"))
+  )
+```
 
 
