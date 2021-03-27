@@ -24,6 +24,7 @@ library(dplyr)
 library(readr)
 library(tidyr)
 library(lubridate)
+library(ggplot2)
 ```
 
 ```{r}
@@ -127,9 +128,34 @@ procedure_train <- procedure_train %>%
   )
 ```
 
+#### Missing Data 
+
+```{r}
+demo_train[!complete.cases(demo_train),]  ## no missing data
+```
+```{r}
+procedure_train[!complete.cases(procedure_train),] ## no missing data
+```
+```{r}
+medication_train[!complete.cases(medication_train),] # no missing data
+```
 
 
-#### Descriptive data
+#### Descriptive Analysis
+
+* Age 
+
+```{r}
+ggplot(data = demo_train) + geom_histogram(mapping=aes(x=age), binwidth=0.5)
+```
+
+* Race
+
+```{r}
+ggplot(demo_train, aes(x = death, fill = race)) +
+  geom_bar() + 
+  scale_fill_viridis_d()
+```
 
 1. Deaths 
 
@@ -160,29 +186,10 @@ demo_train %>%
 summary(demo_train$age)
 ```
 
-5. Statistics in age  
-
-    for patients who had Death == TRUE
-    
+5. Number of days since admission (discharge - admission)
 ```{r}
-demo_train %>% filter(death==TRUE) %>% summary(age)
+gmodels::CrossTable(demo_train$)
 ```
-
-    for patients who had Death == FALSE
-    
-```{r}
-demo_train %>% filter(death==FALSE) %>% summary(age)
-```
-
-
-6. Descriptive statistics for # of days between discharge - admission
-
-```{r}
-summary(demo_train$days_dis_adm)
-```
-
-
-
 
 
 
