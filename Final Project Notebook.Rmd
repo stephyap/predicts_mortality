@@ -129,7 +129,63 @@ procedure_train <- procedure_train %>%
 
 
 
-#### 
+#### Descriptive data
+
+1. Deaths 
+
+```{r}
+demo_train %>% 
+  group_by(death) %>% 
+  summarize(Frequency = n()) %>% 
+  mutate(Relative_Percentage = (Frequency / sum(Frequency))*100)
+```
+
+2. Gender
+```{r}
+demo_train %>% 
+  group_by(gender) %>% 
+  summarize(Frequency = n()) %>% 
+  mutate(Relative_Percentage = (Frequency / sum(Frequency))*100)
+```
+3. Race
+```{r}
+demo_train %>% 
+  group_by(race) %>% 
+  summarize(Frequency = n()) %>% 
+  mutate(Relative_Percentage = (Frequency / sum(Frequency))*100)
+```
+
+4. Age
+```{r}
+summary(demo_train$age)
+```
+
+5. Statistics in age  
+
+    for patients who had Death == TRUE
+    
+```{r}
+demo_train %>% filter(death==TRUE) %>% summary(age)
+```
+
+    for patients who had Death == FALSE
+    
+```{r}
+demo_train %>% filter(death==FALSE) %>% summary(age)
+```
+
+
+6. Descriptive statistics for # of days between discharge - admission
+
+```{r}
+summary(demo_train$days_dis_adm)
+```
+
+
+
+
+
+
 
 
 
