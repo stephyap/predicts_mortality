@@ -149,7 +149,7 @@ medication_train[!complete.cases(medication_train),] # no missing data
 ggplot(data = demo_train) + geom_histogram(mapping=aes(x=age), binwidth=0.5)
 ```
 
-* Race
+* Race by Death
 
 ```{r}
 ggplot(demo_train, aes(x = death, fill = race)) +
@@ -157,7 +157,18 @@ ggplot(demo_train, aes(x = death, fill = race)) +
   scale_fill_viridis_d()
 ```
 
-1. Deaths 
+
+* Death by age
+```{r}
+ggplot(demo_train, 
+       aes(x= age, y= days_dis_adm, color = death)) +
+  geom_point(size = 4) +
+  labs(title = "Age by Number of Days Since Admission by Death") + 
+  theme_minimal() +
+  theme(legend.position = "top") 
+```
+
+* Deaths 
 
 ```{r}
 demo_train %>% 
@@ -166,33 +177,20 @@ demo_train %>%
   mutate(Relative_Percentage = (Frequency / sum(Frequency))*100)
 ```
 
-2. Gender
+* Gender
 ```{r}
 demo_train %>% 
   group_by(gender) %>% 
   summarize(Frequency = n()) %>% 
   mutate(Relative_Percentage = (Frequency / sum(Frequency))*100)
 ```
-3. Race
+* Race
 ```{r}
 demo_train %>% 
   group_by(race) %>% 
   summarize(Frequency = n()) %>% 
   mutate(Relative_Percentage = (Frequency / sum(Frequency))*100)
 ```
-
-4. Age
-```{r}
-summary(demo_train$age)
-```
-
-5. Number of days since admission (discharge - admission)
-```{r}
-gmodels::CrossTable(demo_train$)
-```
-
-
-
 
 
 
