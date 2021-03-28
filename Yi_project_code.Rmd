@@ -1,0 +1,192 @@
+---
+title: "Predicting mortality of SAH"
+output: html_notebook
+---
+
+```{r setup}
+knitr::opts_chunk$set(
+	message = FALSE,
+	warning = FALSE,
+	root.dir = "C:/Users/yiy43/Box Sync/2021 Spring/PH1976/Project"
+)
+demo_tr <- read.csv("./Data/demo_train.csv", header = T)
+demo_te <- read.csv("./Data/demo_test.csv", header = T)
+med_tr <- read.csv("./Data/medication_train.csv", header = T)
+med_te <- read.csv("./Data/medication_test.csv", header = T)
+proc_tr <- read.csv("./Data/procedure_train.csv", header = T)
+proc_te <- read.csv("./Data/procedure_test.csv", header = T)
+
+library(dplyr)
+library(anytime)
+library(tidyverse)
+library(compareGroups)
+```
+
+#### Factor-to-time conversion
+
+also created LOS variable
+```{r}
+demo_tr <- demo_tr %>% 
+  mutate(New_admitted_dt_tm = anytime(New_admitted_dt_tm), 
+         New_discharge_dt_tm = anytime(New_discharge_dt_tm), 
+         los = difftime(New_discharge_dt_tm, New_admitted_dt_tm, 
+                        units = "days"))
+demo_te <- demo_te %>% 
+  mutate(New_admitted_dt_tm = anytime(New_admitted_dt_tm), 
+         New_discharge_dt_tm = anytime(New_discharge_dt_tm), 
+         los = difftime(New_discharge_dt_tm, New_admitted_dt_tm, 
+                        units = "days")
+         )
+
+med_tr$med_started_dt_tm <- anytime(med_tr$med_started_dt_tm)
+med_te$med_started_dt_tm <- anytime(med_te$med_started_dt_tm)
+
+proc_tr$procedure_dt_tm <- anytime(proc_tr$procedure_dt_tm)
+proc_te$procedure_dt_tm <- anytime(proc_te$procedure_dt_tm)
+
+```
+
+#### Descriptive of demographic training data
+
+```{r}
+cg <- compareGroups(death ~ gender+race+age_in_years+los, 
+                    data = demo_tr, 
+                    method = c(3,3,1,2), 
+                    max.xlev = 12, 
+                    Q1 = 0, Q3 = 1)
+createTable(cg, show.n = F, show.p.overall = T)
+```
+- delete the one observation that has unknown gender in demo train
+
+- race has too many categories, need to combine some of them. 
+
+  + Combine Asian, Pacific Islander to category Asian/Pacific Islander.
+  
+  + Combine the minority groups Biracial, Hispanic, Mid Eastern Indian, Native American, and Other to a new category, Others. 
+  
+  + We may want to keep the Unknown category in race. (Are Unknowns missing values?)
+  
+```{r}
+demo_tr_new <- demo_tr %>% filter(gender != "Unknown") %>%
+  mutate(race = fct_recode(race, 
+                           `Asian/Pacific Islander` = 'Asian', 
+                           `Asian/Pacific Islander` = 'Pacific Islander', 
+                           `Others` = 'Biracial', 
+                           `Others` = 'Hispanic', 
+                           `Others` = 'Mid Eastern Indian', 
+                           `Others` = 'Native American', 
+                           `Others` = 'Other')) 
+```
+ 
+Descriptive table for the new demographic training data: 
+```{r}
+cg.new <- compareGroups(death ~ gender+race+age_in_years+los, 
+                    data = demo_tr_new, 
+                    method = c(3,3,1,2), 
+                    Q1 = 0, Q3 = 1)
+createTable(cg.new, show.n = F, show.p.overall = T)
+```
+
+Should we combine Unknown into Others?
+
+#### Descriptives of medication training data
+
+```{r}
+med.tmp1 <- med_tr %>% merge(demo_tr, by = "patient_sk", all.x = T) %>% 
+  mutate(time_from_admit = difftime(med_started_dt_tm, New_admitted_dt_tm, units = "days"))
+  
+med.tmp1.tb <- med.tmp1 %>% group_by(patient_sk) %>% 
+  summarise(n_med = n(), 
+            min_time_from_admit = min(time_from_admit),
+            max_time_from_admit = max(time_from_admit), 
+            any_vaso = any(generic_name %in% c("dopamine", "phenylephrine",  "norepinephrine")), 
+            n_vaso = sum(generic_name %in% c("dopamine", "phenylephrine",  "norepinephrine")))
+```
+
+```{r}
+head(med.tmp1.tb, 10)
+```
+
+```{r}
+cg2 <- compareGroups(~ n_med + n_med + min_time_from_admit + max_time_from_admit + any_vaso + n_vaso, 
+                     data = med.tmp1.tb, 
+                     method = c(1,2,2,2,3,2), Q1 = 0, Q3 = 1)
+createTable(cg2, show.n = F)
+```
+n_med: number of medications per patient.
+
+min_time_from_admit, max_time_from_admit: minimal/maximum time of medication administration after admission to hospital for each patient. 
+
+any_vaso: Did this patient receive at least 1 vassopressor (dopamin, phenylephrine, norepinephrine)?
+
+n_vaso: Number of vassopressors the patient took. 
+
+The number of medications administered to a patient averages at 26 (median = 23) and ranges from 1 to 182. The majority of medications were administered within one day of admission to the hospital. About 18.1% of patient received at lease one vassopressor. 
+
+A descriptive table grouped by any_vaso with 
+
+```{r}
+med.tmp1.tb$any_vaso <- as.factor(med.tmp1.tb$any_vaso)
+cg3 <- compareGroups(any_vaso ~ n_med + n_med + min_time_from_admit + max_time_from_admit + any_vaso + n_vaso + n_vaso, 
+                     data = med.tmp1.tb, 
+                     method = c(1,2,2,2,2,1,2), Q1 = 0, Q3 = 1)
+createTable(cg3, show.n = F)
+```
+
+Patients who have at least one vassopressors tend to have more medications and larger range of medication administration time. 
+
+```{r}
+med_freq <- med_tr %>% group_by(generic_name) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n)) 
+```
+
+The top 10 most freqeuntly administered medications:
+
+```{r}
+head(med_freq, 10)
+```
+
+Those most frequently used medications might not be informative about the mortality. 
+
+#### Descriptives of procedure training data
+
+```{r}
+proc.tmp1 <- proc_tr %>% merge(demo_tr, by = "patient_sk", all.x = T) %>% 
+  mutate(time_from_admit = difftime(procedure_dt_tm, New_admitted_dt_tm, units = "days"))
+  
+proc.tmp1.tb <- proc.tmp1 %>% group_by(patient_sk) %>% 
+  summarise(n_proc = n(), 
+            min_time_from_admit = min(time_from_admit),
+            max_time_from_admit = max(time_from_admit)) 
+```
+
+```{r}
+head(proc.tmp1.tb, 100)
+```
+
+```{r}
+cg3 <- compareGroups(~ n_proc + n_proc + min_time_from_admit + max_time_from_admit, 
+                     data = proc.tmp1.tb, 
+                     method = c(1,2,2,2), 
+                     Q1 = 0, Q3 = 1)
+createTable(cg3, show.n = F)
+```
+
+
+
+The top 10 most freqeuntly used procedure:
+
+```{r}
+proc_freq <- proc_tr %>% group_by(procedure_id) %>%
+  summarise(n = n(), 
+            procedure_description = first(procedure_description)) %>%
+  arrange(desc(n)) 
+```
+
+```{r}
+head(proc_freq, 10)
+```
+
+Are any of the procedures predictive of death?
+
