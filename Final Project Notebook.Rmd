@@ -25,15 +25,18 @@ library(readr)
 library(tidyr)
 library(lubridate)
 library(ggplot2)
+library(anytime)
+library(compareGroups)
+library(tidyverse)
 ```
 
 ```{r}
 library(readr)
 demo_train <- read_csv("demo_train.csv")
 
-medication_train <- read_csv("medication_train.csv")
+med_train <- read_csv("medication_train.csv")
 
-procedure_train <- read_csv("procedure_train.csv")
+proc_train <- read_csv("procedure_train.csv")
 
 ```
 
@@ -43,12 +46,36 @@ procedure_train <- read_csv("procedure_train.csv")
 ```
 
 ```{r}
-# head(medication_train, n=5)
+# head(med_train, n=5)
 ```
 
 ```{r}
-# head(procedure_train, n=5)
+# head(proc_train, n=5)
 ```
+
+#### Factor-to-time conversion
+
+```{r}
+demo_train <- demo_train %>% 
+  mutate(New_admitted_dt_tm = anytime(New_admitted_dt_tm), 
+         New_discharge_dt_tm = anytime(New_discharge_dt_tm))
+# demo_te <- demo_te %>% 
+#   mutate(New_admitted_dt_tm = anytime(New_admitted_dt_tm), 
+#          New_discharge_dt_tm = anytime(New_discharge_dt_tm), 
+#          los = difftime(New_discharge_dt_tm, New_admitted_dt_tm, 
+#                         units = "days")
+#          )
+
+med_train$med_started_dt_tm <- anytime(med_train$med_started_dt_tm)
+# med_te$med_started_dt_tm <- anytime(med_te$med_started_dt_tm)
+
+proc_train$procedure_dt_tm <- anytime(proc_train$procedure_dt_tm)
+# proc_te$procedure_dt_tm <- anytime(proc_te$procedure_dt_tm)
+
+```
+
+
+
 #### Renaming columns 
 ```{r}
 demo_train <- demo_train %>% 
@@ -59,13 +86,13 @@ demo_train <- demo_train %>%
     discharge_date = New_discharge_dt_tm
   )
 
-medication_train <- medication_train %>% 
+med_train <- med_train %>% 
   rename(
     patient_num = patient_sk,
     medication_date = med_started_dt_tm
   )
 
-procedure_train <- procedure_train %>% 
+proc_train <- proc_train %>% 
   rename(
     patient_num = patient_sk,
     procedure_date = procedure_dt_tm
@@ -77,52 +104,58 @@ procedure_train <- procedure_train %>%
 
 #### To combine all prediction variables into one dataset, we first:
 
-- add patient's admission date to the medication_train & procedure_train data, then calculate the day difference
+- add patient's admission date to the med_train & proc_train data, then calculate the day difference
 - remove rows from both dataframes that have more than 3 days
+- convert medication and procedure data from long to wide format. 
+- add outcome variable death to each of the medication and procedure data.
+- apply dimension reduction methods (variable selection, PCA) medication and procedure data (Supervised or unsupervised)?
 - combine all the information into the main demo_train dataset that contains patients' demographics
+- calculate length of stay (LOS) and select only those patients have more than or equal to 3 day of LOS. 
 
 ```{r}
-medication_train <- demo_train %>% 
+med_train <- demo_train %>% 
   select(patient_num, admission_date) %>% 
-  right_join(medication_train)
+  right_join(med_train, by = "patient_num")
 ```
 ```{r}
-procedure_train <- demo_train %>% 
+proc_train <- demo_train %>% 
   select(patient_num, admission_date) %>% 
-  right_join(procedure_train)
+  right_join(proc_train, by = "patient_num")
 ```
 
 
 
 #### Rearranging columns order
 ```{r}
-# colnames(medication_train)
-medication_train <- medication_train[,c(1,3,2,4)]
+# colnames(med_train)
+med_train <- med_train[,c(1,3,2,4)]
 
-# colnames(procedure_train)
-procedure_train <- procedure_train[,c(1,3,4,2,5)]
+# colnames(proc_train)
+proc_train <- proc_train[,c(1,3,4,2,5)]
 ```
 
 
 
 #### Calculating the date intervals in days
 
+- define LOS = discharge_date - admission_date
+
 ```{r}
 demo_train <- demo_train %>% 
   mutate(
-    days_dis_adm = as.numeric(difftime(discharge_date, admission_date, units ="days"))
+    los = as.numeric(difftime(discharge_date, admission_date, units ="days"))
   )
 ```
 
 ```{r}
-medication_train <- medication_train %>% 
+med_train <- med_train %>% 
   mutate(
     days_med_adm = as.numeric(difftime(medication_date, admission_date, units ="days"))
   )
 ```
 
 ```{r}
-procedure_train <- procedure_train %>% 
+proc_train <- proc_train %>% 
   mutate(
     days_pro_adm = as.numeric(difftime(procedure_date, admission_date, units ="days"))
   )
@@ -134,10 +167,10 @@ procedure_train <- procedure_train %>%
 demo_train[!complete.cases(demo_train),]  ## no missing data
 ```
 ```{r}
-procedure_train[!complete.cases(procedure_train),] ## no missing data
+proc_train[!complete.cases(proc_train),] ## no missing data
 ```
 ```{r}
-medication_train[!complete.cases(medication_train),] # no missing data
+med_train[!complete.cases(med_train),] # no missing data
 ```
 
 
@@ -193,16 +226,163 @@ demo_train %>%
 ```
 
 
+##### Descriptive of demographic training data
+
+```{r}
+demo_train$death <- as.factor(demo_train$death)
+cg <- compareGroups(death ~ gender+race+age+los, 
+                    data = demo_train, 
+                    method = c(3,3,1,2), 
+                    max.xlev = 12, 
+                    Q1 = 0, Q3 = 1)
+createTable(cg, show.n = F, show.p.overall = T)
+```
+- delete the one observation that has unknown gender in demo train
+
+- race has too many categories, need to combine some of them. 
+
+  + Combine the minority groups Asian, Pacific Islander, Asian/Pacific Islander, Biracial, Hispanic, Mid Eastern Indian, Native American, and Other to a new category, Others. 
+  
+  + We may want to keep the Unknown category in race. (Are Unknowns missing values?)
+  
+- delete those patients dies within first 3 days (los < 3)
+
+ + 786 patients were deleted. 
+  
+```{r}
+demo_train_new <- demo_train %>% filter(gender != "Unknown") %>%
+  mutate(race = fct_recode(race, 
+                           `Others` = 'Asian', 
+                           `Others` = 'Pacific Islander', 
+                           `Others` = 'Asian/Pacific Islander', 
+                           `Others` = 'Biracial', 
+                           `Others` = 'Hispanic', 
+                           `Others` = 'Mid Eastern Indian', 
+                           `Others` = 'Native American', 
+                           `Others` = 'Other')) %>%
+  filter(los >= 3)
+```
+ 
+* Descriptive table for the new demographic training data: 
+```{r}
+cg.new <- compareGroups(death ~ gender+race+age+los, 
+                    data = demo_train_new, 
+                    method = c(3,3,1,2), 
+                    Q1 = 0, Q3 = 1)
+createTable(cg.new, show.n = F, show.p.overall = T)
+```
+
+Should we combine Unknown into Others?
+
+* Plot of LOS
+
+```{r}
+ggplot(demo_train_new, aes(los, fill = death)) + 
+  geom_histogram(alpha = 0.5, binwidth = 10) + 
+  theme_bw()
+```
+
+##### Descriptives of medication training data
+
+```{r}
+med.tmp1 <- med_train %>% group_by(patient_num) %>% 
+  summarise(n_med = n(), 
+            min_days_med_adm = min(days_med_adm),
+            max_days_med_adm = max(days_med_adm), 
+            any_vaso = any(generic_name %in% c("dopamine", "phenylephrine",  "norepinephrine")), 
+            n_vaso = sum(generic_name %in% c("dopamine", "phenylephrine",  "norepinephrine")))
+```
+
+```{r}
+head(med.tmp1, 10)
+```
+
+```{r}
+cg2 <- compareGroups(~ n_med + n_med + min_days_med_adm + max_days_med_adm + any_vaso + n_vaso, 
+                     data = med.tmp1, 
+                     method = c(1,2,2,2,3,2), Q1 = 0, Q3 = 1)
+createTable(cg2, show.n = F)
+```
+n_med: number of medications per patient.
+
+min_time_from_admit, max_time_from_admit: minimal/maximum time of medication administration after admission to hospital for each patient. 
+
+any_vaso: Did this patient receive at least 1 vassopressor (dopamin, phenylephrine, norepinephrine)?
+
+n_vaso: Number of vassopressors the patient took. 
+
+The number of medications administered to a patient averages at 26 (median = 23) and ranges from 1 to 182. The majority of medications were administered within one day of admission to the hospital. About 18.1% of patient received at lease one vassopressor. 
+
+A descriptive table grouped by any_vaso with 
+
+```{r}
+med.tmp1$any_vaso <- as.factor(med.tmp1$any_vaso)
+cg3 <- compareGroups(any_vaso ~ n_med + n_med + min_days_med_adm + max_days_med_adm + any_vaso + n_vaso + n_vaso, 
+                     data = med.tmp1, 
+                     method = c(1,2,2,2,2,1,2), Q1 = 0, Q3 = 1)
+createTable(cg3, show.n = F)
+```
+
+Patients who have at least one vassopressors tend to have more medications and larger range of medication administration time. 
+
+```{r}
+med_freq <- med_train %>% group_by(generic_name) %>%
+  summarise(n = n()) %>%
+  arrange(desc(n)) 
+```
+
+The top 10 most freqeuntly administered medications:
+
+```{r}
+head(med_freq, 10)
+```
+
+Those most frequently used medications might not be informative about the mortality. 
+
+#### Descriptives of procedure training data
+
+```{r}
+proc.tmp1 <- proc_train %>% group_by(patient_num) %>% 
+  summarise(n_proc = n(), 
+            min_days_pro_adm = min(days_pro_adm),
+            max_days_pro_adm = max(days_pro_adm)) 
+```
+
+```{r}
+head(proc.tmp1, 10)
+```
+
+```{r}
+cg3 <- compareGroups(~ n_proc + n_proc + min_days_pro_adm + max_days_pro_adm, 
+                     data = proc.tmp1, 
+                     method = c(1,2,2,2), 
+                     Q1 = 0, Q3 = 1)
+createTable(cg3, show.n = F)
+```
 
 
 
+The top 10 most freqeuntly used procedure:
+
+```{r}
+proc_freq <- proc_train %>% group_by(procedure_id) %>%
+  summarise(n = n(), 
+            procedure_description = first(procedure_description)) %>%
+  arrange(desc(n)) 
+```
+
+```{r}
+head(proc_freq, 10)
+```
+
+Are any of the procedures predictive of death?
 
 
 #### Combining all dataframes into one by id and admission date (WHEN THE SMALLER DATASETS ARE CLEANED)
 ```{r}
 # joined_df <- demo_train %>% 
-#   left_join(medication_train, by = c('patient_num', 'admission_date')) %>% 
-#   left_join(procedure_train, by = c('patient_num', 'admission_date')) %>% 
+#   left_join(med_train, by = c('patient_num', 'admission_date')) %>% 
+#   left_join(proc_train, by = c('patient_num', 'admission_date')) %>% 
 #   select(-procedure_description)
 ```
 
