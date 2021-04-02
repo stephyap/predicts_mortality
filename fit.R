@@ -43,3 +43,23 @@ l.lambda = l.fit$lambda.min
 l.pred=predict(l.fit, s=l.lambda, newx = test.x)
 mean((l.pred-test.y)^2)
 predict(l.fit, type="coefficients", s=l.lambda)
+
+# lda
+lda_model = lda(y~x, family=binomial, data=train_set)
+lda_pred = predict(lda_model, test_set, type = "response")
+confusion_matrix = table(lda_pred$class, test_set$y)
+print(confusion_matrix)
+mean(lda_pred$class == test_set$y)
+
+# qda
+qda_model = qda(y~x, family=binomial, data=train_set)
+qda_pred = predict(qda_model, test_set, type="response")
+confusion_matrix = table(qda_pred$class, test_set$y)
+print(confusion_matrix)
+mean(qda_pred$class == test_set$y)
+
+# knn
+set.seed(1)
+knn_pred=knn(train, test, y[train_year],k=50)
+table(knn_pred,y[!train_year])
+mean(knn_pred == y[!train_year])
