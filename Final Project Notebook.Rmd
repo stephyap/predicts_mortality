@@ -207,7 +207,7 @@ createTable(cg, show.n = F, show.p.overall = T)
   
   + We may want to keep the Unknown category in race. (Are Unknowns missing values?) //Steph: good question, I would think yes, they are missing values. 
   
-- delete those patients dies within first 3 days (los < 3)
+- delete those patients discharged within first 3 days (los < 3)
 
  + 786 patients were deleted. 
   
@@ -222,7 +222,7 @@ demo_train_new <- demo_train %>% filter(gender != "Unknown") %>%
                            `Others` = 'Mid Eastern Indian', 
                            `Others` = 'Native American', 
                            `Others` = 'Other')) %>%
-  filter(los <= 3)
+  filter(los >= 3)
   
 ```
  
@@ -235,7 +235,7 @@ cg.new <- compareGroups(death ~ gender+race+age+los,
 createTable(cg.new, show.n = F, show.p.overall = T)
 ```
 
-Should we combine Unknown into Others? //Steph: I don't think so, I would think evenly distribute the Unknown into all the categories we have is better than dumping all of it to Others. What does the rest think?
+Should we combine Unknown into Others? //Steph: I don't think so, I would think evenly distribute the Unknown into all the categories we have is better than dumping all of it to Others. What does the rest think? //
 
 * Plot of LOS
 
