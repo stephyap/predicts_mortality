@@ -30,12 +30,9 @@ library(compareGroups)
 library(tidyverse)
 ```
 
-```{r}
-library(readr)
+```{r message=FALSE}
 demo_train <- read_csv("demo_train.csv")
-
 med_train <- read_csv("medication_train.csv")
-
 proc_train <- read_csv("procedure_train.csv")
 
 ```
@@ -57,7 +54,7 @@ proc_train <- read_csv("procedure_train.csv")
 
 ```{r}
 demo_train <- demo_train %>% 
-  mutate(New_admitted_dt_tm = anytime(New_admitted_dt_tm), 
+  mutate(New_admitted_dt_tm = anytime(New_admitted_dt_tm), ## anytime() Parse POSIXct or Date objects from input data
          New_discharge_dt_tm = anytime(New_discharge_dt_tm))
 # demo_te <- demo_te %>% 
 #   mutate(New_admitted_dt_tm = anytime(New_admitted_dt_tm), 
@@ -104,7 +101,7 @@ proc_train <- proc_train %>%
 
 #### To combine all prediction variables into one dataset, we first:
 
-- add patient's admission date to the med_train & proc_train data, then calculate the day difference
+- add patient's admission date to the med_train & proc_train data, then calculate the day difference (X)
 - remove rows from both dataframes that have more than 3 days
 - convert medication and procedure data from long to wide format. 
 - add outcome variable death to each of the medication and procedure data.
@@ -174,7 +171,7 @@ med_train[!complete.cases(med_train),] # no missing data
 ```
 
 
-#### Descriptive Analysis
+####  Plots
 
 * Age 
 
@@ -188,41 +185,6 @@ ggplot(data = demo_train) + geom_histogram(mapping=aes(x=age), binwidth=0.5)
 ggplot(demo_train, aes(x = death, fill = race)) +
   geom_bar() + 
   scale_fill_viridis_d()
-```
-
-
-* Death by age
-```{r}
-ggplot(demo_train, 
-       aes(x= age, y= days_dis_adm, color = death)) +
-  geom_point(size = 4) +
-  labs(title = "Age by Number of Days Since Admission by Death") + 
-  theme_minimal() +
-  theme(legend.position = "top") 
-```
-
-* Deaths 
-
-```{r}
-demo_train %>% 
-  group_by(death) %>% 
-  summarize(Frequency = n()) %>% 
-  mutate(Relative_Percentage = (Frequency / sum(Frequency))*100)
-```
-
-* Gender
-```{r}
-demo_train %>% 
-  group_by(gender) %>% 
-  summarize(Frequency = n()) %>% 
-  mutate(Relative_Percentage = (Frequency / sum(Frequency))*100)
-```
-* Race
-```{r}
-demo_train %>% 
-  group_by(race) %>% 
-  summarize(Frequency = n()) %>% 
-  mutate(Relative_Percentage = (Frequency / sum(Frequency))*100)
 ```
 
 
@@ -243,7 +205,7 @@ createTable(cg, show.n = F, show.p.overall = T)
 
   + Combine the minority groups Asian, Pacific Islander, Asian/Pacific Islander, Biracial, Hispanic, Mid Eastern Indian, Native American, and Other to a new category, Others. 
   
-  + We may want to keep the Unknown category in race. (Are Unknowns missing values?)
+  + We may want to keep the Unknown category in race. (Are Unknowns missing values?) //Steph: good question, I would think yes, they are missing values. 
   
 - delete those patients dies within first 3 days (los < 3)
 
