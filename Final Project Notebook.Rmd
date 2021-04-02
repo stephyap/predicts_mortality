@@ -235,7 +235,37 @@ cg.new <- compareGroups(death ~ gender+race+age+los,
 createTable(cg.new, show.n = F, show.p.overall = T)
 ```
 
-Should we combine Unknown into Others? //Steph: I don't think so, I would think evenly distribute the Unknown into all the categories we have is better than dumping all of it to Others. What does the rest think? //
+Should we combine Unknown into Others? //Steph: I don't think so, I would think evenly distribute the Unknown into all the categories we have is better than dumping all of it to Others. What does the rest think? // Yi: That sounds like a crude imputation. Let's try a imputation model.
+
+```{r}
+library(mice)
+demo.tmp2
+demo.imputed <- mice(demo.tmp2, method = "polyreg", seed = 123, 
+                     printFlag = F, 
+                     formulas = list(race ~ age + gender))
+```
+
+```{r}
+# There are 5 imputed data, select only of them for descriptive analysis.
+demo_imputed <- complete(demo.imputed, 1) 
+cg.new2 <- compareGroups(death ~ gender+race+age+los, 
+                    data = demo_imputed, 
+                    method = c(3,3,1,2), 
+                    Q1 = 0, Q3 = 1)
+createTable(cg.new2, show.n = F, show.p.overall = T)
+```
+
+If we simply delete the unknown values:
+
+```{r}
+demo.tmp3 <- demo_train_new %>% filter(race != "Unknown")
+cg.new3 <- compareGroups(death ~ gender+race+age+los, 
+                    data = demo.tmp3, 
+                    method = c(3,3,1,2), 
+                    Q1 = 0, Q3 = 1)
+createTable(cg.new3, show.n = F, show.p.overall = T)
+```
+Conclusion: delete the Unknowns.
 
 * Plot of LOS
 
@@ -301,6 +331,20 @@ The top 10 most freqeuntly administered medications:
 head(med_freq, 10)
 ```
 
+```{r}
+tail(med_freq, 50)
+```
+
+```{r}
+sum(med_freq$n > 100)
+```
+```{r}
+#table(med_freq$n)
+hist(med_freq$n, nclass = 100)
+```
+
+
+
 Those most frequently used medications might not be informative about the mortality. 
 
 #### Descriptives of procedure training data
@@ -340,6 +384,17 @@ head(proc_freq, 10)
 ```
 
 Are any of the procedures predictive of death?
+
+```{r}
+tail(proc_freq, 100)
+```
+
+```{r}
+sum(proc_freq$n > 50)
+```
+```{r}
+dim(proc_freq)
+```
 
 
 #### Combining all dataframes into one by id and admission date (WHEN THE SMALLER DATASETS ARE CLEANED)
