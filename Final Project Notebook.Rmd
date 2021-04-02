@@ -222,7 +222,8 @@ demo_train_new <- demo_train %>% filter(gender != "Unknown") %>%
                            `Others` = 'Mid Eastern Indian', 
                            `Others` = 'Native American', 
                            `Others` = 'Other')) %>%
-  filter(los >= 3)
+  filter(los <= 3)
+  
 ```
  
 * Descriptive table for the new demographic training data: 
@@ -234,7 +235,7 @@ cg.new <- compareGroups(death ~ gender+race+age+los,
 createTable(cg.new, show.n = F, show.p.overall = T)
 ```
 
-Should we combine Unknown into Others?
+Should we combine Unknown into Others? //Steph: I don't think so, I would think evenly distribute the Unknown into all the categories we have is better than dumping all of it to Others. What does the rest think?
 
 * Plot of LOS
 
@@ -246,13 +247,14 @@ ggplot(demo_train_new, aes(los, fill = death)) +
 
 ##### Descriptives of medication training data
 
-```{r}
-med.tmp1 <- med_train %>% group_by(patient_num) %>% 
-  summarise(n_med = n(), 
+```{r message=FALSE}
+med.tmp1 <- med_train %>% group_by(patient_num) %>%
+  summarise(n_med = n(),
             min_days_med_adm = min(days_med_adm),
-            max_days_med_adm = max(days_med_adm), 
-            any_vaso = any(generic_name %in% c("dopamine", "phenylephrine",  "norepinephrine")), 
-            n_vaso = sum(generic_name %in% c("dopamine", "phenylephrine",  "norepinephrine")))
+            max_days_med_adm = max(days_med_adm),
+            any_vaso = any(generic_name %in% c("dopamine", "phenylephrine",  "norepinephrine")),
+            n_vaso = sum(generic_name %in% c("dopamine", "phenylephrine",  "norepinephrine"))) %>% 
+  ungroup()
 ```
 
 ```{r}
