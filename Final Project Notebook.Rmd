@@ -235,39 +235,41 @@ cg.new <- compareGroups(death ~ gender+race+age+los,
 createTable(cg.new, show.n = F, show.p.overall = T)
 ```
 
-Should we combine Unknown into Others? //Steph: I don't think so, I would think evenly distribute the Unknown into all the categories we have is better than dumping all of it to Others. What does the rest think? // Yi: That sounds like a crude imputation. Let's try a imputation model.
 
 ```{r}
-library(mice)
-demo.tmp2
-demo.imputed <- mice(demo.tmp2, method = "polyreg", seed = 123, 
-                     printFlag = F, 
-                     formulas = list(race ~ age + gender))
+# library(mice)
+# demo.tmp2
+# demo.imputed <- mice(demo.tmp2, method = "polyreg", seed = 123, 
+#                      printFlag = F, 
+#                      formulas = list(race ~ age + gender))
 ```
 
 ```{r}
 # There are 5 imputed data, select only of them for descriptive analysis.
-demo_imputed <- complete(demo.imputed, 1) 
-cg.new2 <- compareGroups(death ~ gender+race+age+los, 
-                    data = demo_imputed, 
-                    method = c(3,3,1,2), 
-                    Q1 = 0, Q3 = 1)
-createTable(cg.new2, show.n = F, show.p.overall = T)
+# demo_imputed <- complete(demo.imputed, 1) 
+# cg.new2 <- compareGroups(death ~ gender+race+age+los, 
+#                     data = demo_imputed, 
+#                     method = c(3,3,1,2), 
+#                     Q1 = 0, Q3 = 1)
+# createTable(cg.new2, show.n = F, show.p.overall = T)
 ```
 
-If we simply delete the unknown values:
+### Delete Unknowns in race since the missingness is <10%. 
 
 ```{r}
-demo.tmp3 <- demo_train_new %>% filter(race != "Unknown")
-cg.new3 <- compareGroups(death ~ gender+race+age+los, 
-                    data = demo.tmp3, 
+demo.tmp <- demo_train_new %>% filter(race != "Unknown")
+cg.new <- compareGroups(death ~ gender+race+age+los, 
+                    data = demo.tmp, 
                     method = c(3,3,1,2), 
                     Q1 = 0, Q3 = 1)
-createTable(cg.new3, show.n = F, show.p.overall = T)
+createTable(cg.new, show.n = F, show.p.overall = T)
 ```
-Conclusion: delete the Unknowns.
+
 
 * Plot of LOS
+```{r}
+demo_train <- demo_train_new %>% filter(race != "Unknown")
+```
 
 ```{r}
 ggplot(demo_train_new, aes(los, fill = death)) + 
@@ -277,6 +279,16 @@ ggplot(demo_train_new, aes(los, fill = death)) +
 
 ##### Descriptives of medication training data
 
+New variables' definition/Codebook:
+    
+    n_med: number of medications per patient.
+    
+    min_time_from_admit, max_time_from_admit: minimal/maximum time of medication administration after admission to hospital for each patient. 
+    
+    any_vaso: Did this patient receive at least 1 vassopressor (dopamin, phenylephrine, norepinephrine)?
+    
+    n_vaso: Number of vassopressors the patient took. 
+    
 ```{r message=FALSE}
 med.tmp1 <- med_train %>% group_by(patient_num) %>%
   summarise(n_med = n(),
@@ -288,7 +300,7 @@ med.tmp1 <- med_train %>% group_by(patient_num) %>%
 ```
 
 ```{r}
-head(med.tmp1, 10)
+# head(med.tmp1, 10)
 ```
 
 ```{r}
@@ -297,55 +309,35 @@ cg2 <- compareGroups(~ n_med + n_med + min_days_med_adm + max_days_med_adm + any
                      method = c(1,2,2,2,3,2), Q1 = 0, Q3 = 1)
 createTable(cg2, show.n = F)
 ```
-n_med: number of medications per patient.
-
-min_time_from_admit, max_time_from_admit: minimal/maximum time of medication administration after admission to hospital for each patient. 
-
-any_vaso: Did this patient receive at least 1 vassopressor (dopamin, phenylephrine, norepinephrine)?
-
-n_vaso: Number of vassopressors the patient took. 
 
 The number of medications administered to a patient averages at 26 (median = 23) and ranges from 1 to 182. The majority of medications were administered within one day of admission to the hospital. About 18.1% of patient received at lease one vassopressor. 
 
-A descriptive table grouped by any_vaso with 
+A descriptive table grouped by any_vaso:
 
 ```{r}
 med.tmp1$any_vaso <- as.factor(med.tmp1$any_vaso)
-cg3 <- compareGroups(any_vaso ~ n_med + n_med + min_days_med_adm + max_days_med_adm + any_vaso + n_vaso + n_vaso, 
+cg3 <- compareGroups(any_vaso ~ n_med + min_days_med_adm + max_days_med_adm + n_vaso , 
                      data = med.tmp1, 
                      method = c(1,2,2,2,2,1,2), Q1 = 0, Q3 = 1)
 createTable(cg3, show.n = F)
 ```
 
-Patients who have at least one vassopressors tend to have more medications and larger range of medication administration time. 
+The table above shows that patients who have at least taken one vasopressors tend to have taken higher number of medications and larger range of medication administration time. 
 
-```{r}
+```{r message=FALSE}
 med_freq <- med_train %>% group_by(generic_name) %>%
   summarise(n = n()) %>%
   arrange(desc(n)) 
 ```
 
-The top 10 most freqeuntly administered medications:
+The top 6 most frequently administered medications:
 
 ```{r}
-head(med_freq, 10)
+head(med_freq)
 ```
 
-```{r}
-tail(med_freq, 50)
-```
+DOUBLE CHECK:: Steph: We are planning to create dummy variables for each medication that had been prescribed to at least 500 patients in the dataset.
 
-```{r}
-sum(med_freq$n > 100)
-```
-```{r}
-#table(med_freq$n)
-hist(med_freq$n, nclass = 100)
-```
-
-
-
-Those most frequently used medications might not be informative about the mortality. 
 
 #### Descriptives of procedure training data
 
@@ -392,6 +384,7 @@ tail(proc_freq, 100)
 ```{r}
 sum(proc_freq$n > 50)
 ```
+
 ```{r}
 dim(proc_freq)
 ```
