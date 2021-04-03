@@ -34,20 +34,6 @@ library(tidyverse)
 demo_train <- read_csv("demo_train.csv")
 med_train <- read_csv("medication_train.csv")
 proc_train <- read_csv("procedure_train.csv")
-
-```
-
-#### Viewing top 5 rows for each datasets
-```{r}
-# head(demo_train, n=5)
-```
-
-```{r}
-# head(med_train, n=5)
-```
-
-```{r}
-# head(proc_train, n=5)
 ```
 
 #### Factor-to-time conversion
@@ -70,7 +56,6 @@ proc_train$procedure_dt_tm <- anytime(proc_train$procedure_dt_tm)
 # proc_te$procedure_dt_tm <- anytime(proc_te$procedure_dt_tm)
 
 ```
-
 
 
 #### Renaming columns 
@@ -98,16 +83,15 @@ proc_train <- proc_train %>%
 
 
 
-
 #### To combine all prediction variables into one dataset, we first:
 
-- add patient's admission date to the med_train & proc_train data, then calculate the day difference (X)
-- remove rows from both dataframes that have more than 3 days
-- convert medication and procedure data from long to wide format. 
-- add outcome variable death to each of the medication and procedure data.
-- apply dimension reduction methods (variable selection, PCA) medication and procedure data (Supervised or unsupervised)?
-- combine all the information into the main demo_train dataset that contains patients' demographics
-- calculate length of stay (LOS) and select only those patients have more than or equal to 3 day of LOS. 
+    - add patient's admission date to the med_train & proc_train data, then calculate the day difference (X)
+    - remove rows from both dataframes that have more than 3 days
+    - convert medication and procedure data from long to wide format. 
+    - add outcome variable death to each of the medication and procedure data.
+    - apply dimension reduction methods (variable selection, PCA) medication and procedure data (Supervised or unsupervised)?
+    - combine all the information into the main demo_train dataset that contains patients' demographics
+    - calculate length of stay (LOS) and select only those patients have more than or equal to 3 day of LOS. 
 
 ```{r}
 med_train <- demo_train %>% 
@@ -119,7 +103,6 @@ proc_train <- demo_train %>%
   select(patient_num, admission_date) %>% 
   right_join(proc_train, by = "patient_num")
 ```
-
 
 
 #### Rearranging columns order
@@ -158,8 +141,14 @@ proc_train <- proc_train %>%
   )
 ```
 
-#### Missing Data 
 
+
+
+
+#### Checking Missingness
+
+    No missing data in all three training datasets. 
+    
 ```{r}
 demo_train[!complete.cases(demo_train),]  ## no missing data
 ```
@@ -171,7 +160,7 @@ med_train[!complete.cases(med_train),] # no missing data
 ```
 
 
-####  Plots
+####  Data Visualization 
 
 * Age 
 
@@ -188,7 +177,9 @@ ggplot(demo_train, aes(x = death, fill = race)) +
 ```
 
 
-##### Descriptive of demographic training data
+
+
+#### Descriptive of demographic training data
 
 ```{r}
 demo_train$death <- as.factor(demo_train$death)
@@ -199,17 +190,18 @@ cg <- compareGroups(death ~ gender+race+age+los,
                     Q1 = 0, Q3 = 1)
 createTable(cg, show.n = F, show.p.overall = T)
 ```
-- delete the one observation that has unknown gender in demo train
 
-- race has too many categories, need to combine some of them. 
-
-  + Combine the minority groups Asian, Pacific Islander, Asian/Pacific Islander, Biracial, Hispanic, Mid Eastern Indian, Native American, and Other to a new category, Others. 
-  
-  + We may want to keep the Unknown category in race. (Are Unknowns missing values?) //Steph: good question, I would think yes, they are missing values. 
-  
-- delete those patients discharged within first 3 days (los < 3)
-
- + 786 patients were deleted. 
+    - delete the one observation that has unknown gender in demo train
+    
+    - race has too many categories, need to combine some of them. 
+    
+      + Combine the minority groups Asian, Pacific Islander, Asian/Pacific Islander, Biracial, Hispanic, Mid Eastern Indian, Native American, and Other to a new category, Others. 
+      
+      + We may want to keep the Unknown category in race. (Are Unknowns missing values?) //Steph: good question, I would think yes, they are missing values. 
+      
+    - delete those patients discharged within first 3 days (los < 3)
+    
+     + 786 patients were deleted. 
   
 ```{r}
 demo_train_new <- demo_train %>% filter(gender != "Unknown") %>%
@@ -226,7 +218,8 @@ demo_train_new <- demo_train %>% filter(gender != "Unknown") %>%
   
 ```
  
-* Descriptive table for the new demographic training data: 
+ 
+#### Descriptive analysis for new demographic training data: 
 ```{r}
 cg.new <- compareGroups(death ~ gender+race+age+los, 
                     data = demo_train_new, 
@@ -254,7 +247,7 @@ createTable(cg.new, show.n = F, show.p.overall = T)
 # createTable(cg.new2, show.n = F, show.p.overall = T)
 ```
 
-### Delete Unknowns in race since the missingness is <10%. 
+Deleting Unknowns in race variable since the missingness is <10%. 
 
 ```{r}
 demo.tmp <- demo_train_new %>% filter(race != "Unknown")
@@ -299,9 +292,6 @@ med.tmp1 <- med_train %>% group_by(patient_num) %>%
   ungroup()
 ```
 
-```{r}
-# head(med.tmp1, 10)
-```
 
 ```{r}
 cg2 <- compareGroups(~ n_med + n_med + min_days_med_adm + max_days_med_adm + any_vaso + n_vaso, 
@@ -310,9 +300,9 @@ cg2 <- compareGroups(~ n_med + n_med + min_days_med_adm + max_days_med_adm + any
 createTable(cg2, show.n = F)
 ```
 
-The number of medications administered to a patient averages at 26 (median = 23) and ranges from 1 to 182. The majority of medications were administered within one day of admission to the hospital. About 18.1% of patient received at lease one vassopressor. 
+    The number of medications administered to a patient averages at 26 (median = 23) and ranges from 1 to 182. The majority of medications were administered within one day of admission to the hospital. About 18.1% of patient received at lease one vassopressor. 
 
-A descriptive table grouped by any_vaso:
+#### Descriptive analysis grouped by any_vaso:
 
 ```{r}
 med.tmp1$any_vaso <- as.factor(med.tmp1$any_vaso)
@@ -322,35 +312,32 @@ cg3 <- compareGroups(any_vaso ~ n_med + min_days_med_adm + max_days_med_adm + n_
 createTable(cg3, show.n = F)
 ```
 
-The table above shows that patients who have at least taken one vasopressors tend to have taken higher number of medications and larger range of medication administration time. 
+    The table above shows that patients who have at least taken one vasopressors tend to have taken higher number of medications and larger range of medication administration time. 
 
 ```{r message=FALSE}
 med_freq <- med_train %>% group_by(generic_name) %>%
   summarise(n = n()) %>%
   arrange(desc(n)) 
-```
 
-The top 6 most frequently administered medications:
-
-```{r}
-head(med_freq)
+med_freq
 ```
 
 DOUBLE CHECK:: Steph: We are planning to create dummy variables for each medication that had been prescribed to at least 500 patients in the dataset.
 
 
-#### Descriptives of procedure training data
+
+
+#### Descriptives analysis for procedure training data
 
 ```{r}
 proc.tmp1 <- proc_train %>% group_by(patient_num) %>% 
   summarise(n_proc = n(), 
             min_days_pro_adm = min(days_pro_adm),
             max_days_pro_adm = max(days_pro_adm)) 
+
+proc.tmp1
 ```
 
-```{r}
-head(proc.tmp1, 10)
-```
 
 ```{r}
 cg3 <- compareGroups(~ n_proc + n_proc + min_days_pro_adm + max_days_pro_adm, 
@@ -362,31 +349,25 @@ createTable(cg3, show.n = F)
 
 
 
-The top 10 most freqeuntly used procedure:
+#### View frequently used procedured by procedure_id:
+
+    There's a total of 1254 procedures. The top 3 most used procedure is arteriography of cerebral arteries, minsertion of endotracheal tube followed by continuous invasive mechanical ventilation for less than 96 consecutive hours.
 
 ```{r}
 proc_freq <- proc_train %>% group_by(procedure_id) %>%
   summarise(n = n(), 
             procedure_description = first(procedure_description)) %>%
   arrange(desc(n)) 
+
+proc_freq
 ```
 
-```{r}
-head(proc_freq, 10)
-```
+
 
 Are any of the procedures predictive of death?
 
 ```{r}
-tail(proc_freq, 100)
-```
-
-```{r}
 sum(proc_freq$n > 50)
-```
-
-```{r}
-dim(proc_freq)
 ```
 
 
