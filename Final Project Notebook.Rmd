@@ -386,3 +386,20 @@ joined_df <- demo_train_new %>%
   left_join(proc.tmp1, by = c('patient_num'))
 ```
 
+#### Predictive Model Approaches 
+
+1. Basic logistic regression 
+```{r}
+logit <- glm(death ~ gender + race + age + los + n_med + min_days_med_adm + max_days_med_adm + any_vaso + n_vaso + n_proc + min_days_pro_adm + max_days_pro_adm, data = , family = "binomial")
+
+summary(logit)
+```
+
+```{r}
+coef(logit)
+```
+
+```{r}
+summary(logit)$coef
+```
+
