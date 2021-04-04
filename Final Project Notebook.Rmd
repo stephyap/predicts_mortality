@@ -381,9 +381,8 @@ Are any of the procedures predictive of death?
 
 #### Combining all dataframes into one by id and admission date (WHEN THE SMALLER DATASETS ARE CLEANED)
 ```{r}
-# joined_df <- demo_train %>% 
-#   left_join(med_train, by = c('patient_num', 'admission_date')) %>% 
-#   left_join(proc_train, by = c('patient_num', 'admission_date')) %>% 
-#   select(-procedure_description)
+joined_df <- demo_train_new %>%
+  left_join(med.tmp1, by = c('patient_num')) %>%
+  left_join(proc.tmp1, by = c('patient_num'))
 ```
 
