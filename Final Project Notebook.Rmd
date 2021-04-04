@@ -28,6 +28,7 @@ library(ggplot2)
 library(anytime)
 library(compareGroups)
 library(tidyverse)
+library(janitor)
 ```
 
 ```{r message=FALSE}
@@ -324,14 +325,10 @@ med_freq
 
 DOUBLE CHECK:: We are planning to create dummy variables for each medication that had been prescribed to at least 500 patients in the dataset.
 
-#### Creating binary variables for the top 20 most used procedures (in process)
-```{r message=FALSE}
-install.packages('janitor')
-library(janitor)
-```
+#### Viewing the most used procedures in propotions 
 
 ```{r}
-janitor::tabyl(proc_train, procedure_id) %>% arrange(desc(n)) %>% top_n(20)
+janitor::tabyl(med_train, generic_name) %>% arrange(desc(n)) %>% top_n(20)
 ```
 
 
@@ -371,23 +368,15 @@ proc_freq
 ```
 
 
+#### Viewing the most used procedures in propotions 
+```{r}
+janitor::tabyl(proc_train, procedure_id) %>% arrange(desc(n)) %>% top_n(20)
+```
+
 Are any of the procedures predictive of death?
-
 ```{r}
-sum(proc_freq$n > 50)
+
 ```
-
-
-#### Creating binary variables for the top 20 most used procedures 
-```{r}
-proc_freq
-```
-
-
-
-
-
-
 
 
 #### Combining all dataframes into one by id and admission date (WHEN THE SMALLER DATASETS ARE CLEANED)
