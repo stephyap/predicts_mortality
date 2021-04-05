@@ -29,6 +29,12 @@ library(anytime)
 library(compareGroups)
 library(tidyverse)
 library(janitor)
+library(randomForest)
+library(gbm)
+library(glmnet)
+library(smotefamily)
+library(caret)
+library(AUC)
 ```
 
 ```{r message=FALSE}
@@ -385,6 +391,168 @@ joined_df <- demo_train_new %>%
   left_join(med.tmp1, by = c('patient_num')) %>%
   left_join(proc.tmp1, by = c('patient_num'))
 ```
+
+### BB - pivot med and proc dfs and merge with joined_df to get individual meds/procedures as features
+```{r}
+# filter to only medications with 50 or more patients
+med_freq_filter = filter(med_freq, n>50)
+#remove cols from med df so we get one row per patient after pivoting
+med_train = subset(med_train, select=-c(admission_date, medication_date))
+# pivot med df to get one row per patient
+med_train_pivot = med_train %>% pivot_wider(names_from = generic_name, values_from = days_med_adm, values_fn = mean)
+#select subset of med pivot df with only medications given to 50 or more patients
+med_train_pivot_filter = subset(med_train_pivot,select= c('patient_num',med_freq_filter$generic_name))
+```
+
+#repeat above 4 steps for procedures df
+```{r}
+proc_freq_filter = filter(proc_freq, n>50)
+proc_train = subset(proc_train, select=-c(procedure_description,admission_date, procedure_date))
+proc_train_pivot = proc_train %>% pivot_wider(names_from = procedure_id, values_from = days_pro_adm, values_fn = mean)
+proc_train_pivot_filter = subset(proc_train_pivot,select= c('patient_num',proc_freq_filter$procedure_id))
+```
+
+# merge into master df
+```{r}
+merged_train_df = joined_df %>%
+  left_join(med_train_pivot_filter, by = c('patient_num')) %>% 
+   left_join(proc_train_pivot_filter, by = c('patient_num'))
+```
+
+### BB make final train set
+```{r}
+#convert NAs to zeros
+merged_train_df[is.na(merged_train_df)] = 0
+
+#remove patient id, admission/discharge dates, and length of stay to get final training set
+train_final = subset(merged_train_df,select= -c(patient_num,admission_date,discharge_date,los))
+```
+
+#convert categorical variables to factors
+```{r}
+train_final$gender = as.factor(train_final$gender)
+```
+
+#convert response variable to binary
+```{r}
+train_final$death = as.integer(as.logical(train_final$death))
+```
+
+#split training data into training and validation sets
+```{r}
+set.seed(3)
+n=nrow(train_final)
+train.index=sample(1:n, n*0.75)
+train=train_final[train.index,]
+validation=train_final[-train.index,]
+```
+
+# logistic regression
+#first run accuracy = 81.0%
+```{r}
+#fit model on training data
+glm.fit=glm(death~., data=train, family=binomial)
+
+#get predictions on validation set
+glm.probs=predict(glm.fit, newdata=validation, type="response") 
+glm.pred=ifelse(glm.probs>0.5, 1, 0)
+val.accuracy = mean(glm.pred==validation$death)
+val.accuracy
+#confusion matrix
+table(glm.pred, validation$death)
+```
+# logistic regression summary
+```{r}
+summary(glm.fit)
+```
+
+#gradient boost
+# first run with n.trees=1000 and shrinkage=0.01, accuracy = 0.806
+# however, 80% of actual outcomes are 0, so this is not a skillful model
+# likely need to balance the classes between train and test sets to get better results
+```{r}
+#fit model
+boost = gbm(death~.,data=train,distribution='bernoulli',n.trees=1000,shrinkage=0.01)
+#get predicted probabilities
+train.probs = predict(boost, train, n.trees = 1000)
+val.probs = predict(boost, validation, n.trees = 1000)
+#get binary predictions
+train.pred=ifelse(train.probs>0.5, 1, 0)
+val.pred=ifelse(val.probs>0.5, 1,0)
+#get accuracy 
+train.accuracy = mean(train.pred==train$death)
+val.accuracy = mean(val.pred==validation$death)
+val.accuracy
+#confusion matrix
+table(val.pred, validation$death)
+```
+
+# oversampling to balance classes
+```{r}
+#make dummy vars from categorical vars
+train.dummy = dummyVars("~.",data=train)
+train.onehot = data.frame(predict(train.dummy,newdata=train))
+validation.dummy = dummyVars("~.",data=validation)
+validation.onehot = data.frame(predict(validation.dummy,newdata=validation))
+#SMOTE to balance classes - training set only
+train.balanced = SMOTE(X=train.onehot[,-8],target=train.onehot[,8])
+train.balanced = train.balanced$data
+train.balanced = train.balanced %>% rename(death = class)
+table(train.balanced$death)
+table(train$death)
+```
+
+# logistic regression on balanced data
+# accuracy = 76.3%
+# positive class recall increased from 38% to 66% by using class balanced rather than raw data
+```{r}
+train.balanced$death = as.numeric(train.balanced$death)
+
+#fit model on training data
+glm.fit=glm(death~., data=train.balanced, family=binomial)
+
+#get predictions on validation set
+glm.probs=predict(glm.fit, newdata=validation.onehot, type="response") 
+glm.pred=ifelse(glm.probs>0.5, 1, 0)
+val.accuracy = mean(glm.pred==validation.onehot$death)
+val.accuracy
+#confusion matrix
+table(glm.pred, validation.onehot$death)
+```
+
+#gradient boost
+# accuracy = 0.812
+# boosting still predicting very few positive outcomes
+```{r}
+#fit model
+boost = gbm(death~.,data=train.balanced,distribution='bernoulli',n.trees=1000,shrinkage=0.01)
+#get predicted probabilities
+train.probs = predict(boost, train.balanced, n.trees = 1000)
+val.probs = predict(boost, validation.onehot, n.trees = 1000)
+#get binary predictions
+train.pred=ifelse(train.probs>0.5, 1, 0)
+val.pred=ifelse(val.probs>0.5, 1,0)
+#get accuracy 
+train.accuracy = mean(train.pred==train.balanced$death)
+val.accuracy = mean(val.pred==validation.onehot$death)
+val.accuracy
+#confusion matrix
+table(val.pred, validation.onehot$death)
+```
+
+#feature importance
+```{r}
+summary(boost)
+```
+
+#compute AUC and plot ROC-AUC curve
+```{r}
+labels=factor(validation$death)
+auc(roc(val.probs,labels))
+plot(roc(val.probs,labels))
+```
+
+
 
 #### Predictive Model Approaches 
 
