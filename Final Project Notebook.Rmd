@@ -571,3 +571,90 @@ coef(logit)
 summary(logit)$coef
 ```
 
+```{r}
+set.seed(1)
+n=nrow(joined_df)
+train.i=sample(1:n, n*0.75)
+train=joined_df[train.i,]
+validation=joined_df[-train.i,]
+```
+
+2. KNN
+```{r}
+train1=as.matrix(train$n_med)
+validation1=as.matrix(validation$n_med)
+set.seed(1)
+knn_pred=knn(train1, validation1, train$death, k=1, prob=T, use.all = FALSE)
+table(knn_pred, validation$death)
+mean(knn_pred == validation$death)
+```
+
+3. LDA
+```{r}
+lda_model = lda(death~., family=binomial, data=train)
+lda_pred = predict(lda_model, validation, type = "response")
+confusion_matrix = table(lda_pred$class, validation$death)
+print(confusion_matrix)
+mean(lda_pred$class == validation$death)
+```
+
+4. QDA
+```{r}
+qda_model = qda(death~n_med+n_proc, family=binomial, data=train)
+qda_pred = predict(qda_model, validation, type="response")
+# qda_model
+confusion_matrix = table(qda_pred$class, validation$death)
+print(confusion_matrix)
+mean(qda_pred$class == validation$death)
+```
+
+5.Tree
+```{r}
+tree_model=tree(as.factor(death)~.,joined_df)
+summary(tree_model)
+plot(tree_model)
+text(tree_model,pretty=0)
+tree_model
+train.pred = predict(tree_model, train, type="class")
+val.pred = predict(tree_model, validation,type="class")
+#get binary predictions
+confusion_matrix = table(train.pred, train$death)
+print(confusion_matrix)
+confusion_matrix1 = table(val.pred, validation$death)
+print(confusion_matrix1)
+mean(train.pred==train$death)
+mean(val.pred==validation$death)
+
+```
+
+6. Bagging
+```{r}
+bag=randomForest(as.factor(death)~n_vaso, data=train, mtry=9, ntree=100, importance=TRUE)
+plot(bag)
+bag
+train.p = predict(bag, train, type="prob")
+# train.p
+val.p = predict(bag, validation, type= "prob")
+# val.p
+#predictions
+train.pred=ifelse(train.p>0.5, 1, 0)
+val.pred=ifelse(val.p>0.5, 1,0)
+#accuracy
+mean(train.pred==train$death)
+mean(val.pred==validation$death)
+```
+
+7. Random forest
+```{r}
+rf=randomForest(as.factor(death)~.,data=train, mtry=3, n.tree=100)
+rf
+train.p = predict(rf, train,type= "prob")
+val.p = predict(rf, validation,type= "prob")
+
+#predictions
+train.pred=ifelse(train.p>0.5, 1, 0)
+val.pred=ifelse(val.p>0.5, 1,0)
+#accuracy
+mean(train.pred==train$death)
+mean(val.pred==validation$death)
+```
