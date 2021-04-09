@@ -460,6 +460,11 @@ train_final$gender = as.factor(train_final$gender)
 train_final$death = as.integer(as.logical(train_final$death))
 ```
 
+```{r}
+train_final = train_final %>% select(-patient_num, -los)
+```
+
+
 #split training data into training and validation sets
 ```{r}
 set.seed(3)
@@ -469,19 +474,20 @@ train=train_final[train.index,]
 validation=train_final[-train.index,]
 ```
 
+
+
 ### Dimension reduction
-
-
 
 ### Predictive models
 
 # logistic regression
 #first run accuracy = 81.0%
 
-# use binary meds and procs, the accuracy is 85.7%
+# Using binary meds and procs, accurcy is 83.2%
+
 ```{r}
 #fit model on training data
-glm.fit=glm(death~., data=train[, -1], family=binomial)
+glm.fit=glm(death~., data=train, family=binomial)
 
 #get predictions on validation set
 glm.probs=predict(glm.fit, newdata=validation, type="response") 
@@ -501,10 +507,10 @@ summary(glm.fit)
 # however, 80% of actual outcomes are 0, so this is not a skillful model
 # likely need to balance the classes between train and test sets to get better results
 
-# use the binary meds or proc variable, we get 0.83511
+# use the binary meds or proc variable, we get 0.817
 ```{r}
 #fit model
-boost = gbm(death~.,data=train[,-1],distribution='bernoulli',n.trees=1000,shrinkage=0.01)
+boost = gbm(death~.,data=train,distribution='bernoulli',n.trees=1000,shrinkage=0.01)
 #get predicted probabilities
 train.probs = predict(boost, train, n.trees = 1000)
 val.probs = predict(boost, validation, n.trees = 1000)
