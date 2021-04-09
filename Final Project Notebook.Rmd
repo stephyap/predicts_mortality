@@ -380,10 +380,6 @@ janitor::tabyl(proc_train, procedure_id) %>% arrange(desc(n)) %>% top_n(20)
 ```
 
 Are any of the procedures predictive of death?
-```{r}
-
-```
-
 
 #### Combining all dataframes into one by id and admission date (WHEN THE SMALLER DATASETS ARE CLEANED)
 ```{r}
@@ -393,22 +389,33 @@ joined_df <- demo_train_new %>%
 ```
 
 ### BB - pivot med and proc dfs and merge with joined_df to get individual meds/procedures as features
+
 ```{r}
 # filter to only medications with 50 or more patients
-med_freq_filter = filter(med_freq, n>50)
+med_freq_filter = filter(med_freq, n>50) # 168 meds with 50 or more patients
 #remove cols from med df so we get one row per patient after pivoting
 med_train = subset(med_train, select=-c(admission_date, medication_date))
 # pivot med df to get one row per patient
-med_train_pivot = med_train %>% pivot_wider(names_from = generic_name, values_from = days_med_adm, values_fn = mean)
+med_train_pivot = med_train %>%
+  group_by(patient_num, generic_name) %>%
+  filter(row_number() == 1) %>%
+  mutate(n = 1) %>%
+  pivot_wider(id_cols = patient_num, names_from = generic_name, values_from = n, values_fill = list(n = 0))
+  #pivot_wider(names_from = generic_name, values_from = days_med_adm, values_fn = mean)
 #select subset of med pivot df with only medications given to 50 or more patients
 med_train_pivot_filter = subset(med_train_pivot,select= c('patient_num',med_freq_filter$generic_name))
 ```
 
 #repeat above 4 steps for procedures df
 ```{r}
-proc_freq_filter = filter(proc_freq, n>50)
+proc_freq_filter = filter(proc_freq, n>50) # 59 procs with > 50 patients
 proc_train = subset(proc_train, select=-c(procedure_description,admission_date, procedure_date))
-proc_train_pivot = proc_train %>% pivot_wider(names_from = procedure_id, values_from = days_pro_adm, values_fn = mean)
+proc_train_pivot = proc_train %>% 
+  group_by(patient_num, procedure_id) %>%
+  filter(row_number() == 1) %>%
+  mutate(n = 1) %>%
+  pivot_wider(id_cols = patient_num, names_from = procedure_id, values_from = n, values_fill = list(n = 0))
+  # pivot_wider(names_from = procedure_id, values_from = days_pro_adm, values_fn = mean)
 proc_train_pivot_filter = subset(proc_train_pivot,select= c('patient_num',proc_freq_filter$procedure_id))
 ```
 
@@ -420,12 +427,27 @@ merged_train_df = joined_df %>%
 ```
 
 ### BB make final train set
+
 ```{r}
 #convert NAs to zeros
 merged_train_df[is.na(merged_train_df)] = 0
 
-#remove patient id, admission/discharge dates, and length of stay to get final training set
-train_final = subset(merged_train_df,select= -c(patient_num,admission_date,discharge_date,los))
+#admission/discharge dates to get final training set 
+train_final = subset(merged_train_df,select= -c(admission_date,discharge_date))
+```
+
+```{r}
+save(train_final, file = "train_final.RData")
+```
+
+# load data
+```{r}
+load("train_final.RData")
+```
+# a quick descriptive
+```{r}
+tb <- createTable(compareGroups(death ~. , data = train_final[, -1]))
+export2word(tb, file = "train_final_descr.doc")
 ```
 
 #convert categorical variables to factors
@@ -447,11 +469,19 @@ train=train_final[train.index,]
 validation=train_final[-train.index,]
 ```
 
+### Dimension reduction
+
+
+
+### Predictive models
+
 # logistic regression
 #first run accuracy = 81.0%
+
+# use binary meds and procs, the accuracy is 85.7%
 ```{r}
 #fit model on training data
-glm.fit=glm(death~., data=train, family=binomial)
+glm.fit=glm(death~., data=train[, -1], family=binomial)
 
 #get predictions on validation set
 glm.probs=predict(glm.fit, newdata=validation, type="response") 
@@ -470,9 +500,11 @@ summary(glm.fit)
 # first run with n.trees=1000 and shrinkage=0.01, accuracy = 0.806
 # however, 80% of actual outcomes are 0, so this is not a skillful model
 # likely need to balance the classes between train and test sets to get better results
+
+# use the binary meds or proc variable, we get 0.83511
 ```{r}
 #fit model
-boost = gbm(death~.,data=train,distribution='bernoulli',n.trees=1000,shrinkage=0.01)
+boost = gbm(death~.,data=train[,-1],distribution='bernoulli',n.trees=1000,shrinkage=0.01)
 #get predicted probabilities
 train.probs = predict(boost, train, n.trees = 1000)
 val.probs = predict(boost, validation, n.trees = 1000)
@@ -551,8 +583,6 @@ labels=factor(validation$death)
 auc(roc(val.probs,labels))
 plot(roc(val.probs,labels))
 ```
-
-
 
 #### Predictive Model Approaches 
 
