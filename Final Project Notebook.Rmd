@@ -526,11 +526,11 @@ new_train = pca_new_train[, 1:82]
 new_validationset = t[, 1:81]
 ```
 
-#fit model on new PCA training data
+# fit logistic reg model on new PCA training data
 ```{r}
 glm.fit=glm(death~., data=new_train, family=binomial)
 ```
-#get predictions on PCA validation set
+# get predictions on PCA validation set
 ```{r}
 glm.probs=predict(glm.fit, newdata=new_validationset, type="response") 
 glm.pred=ifelse(glm.probs>0.5, 1, 0)
@@ -539,10 +539,19 @@ val.accuracy
 ```
 
 #confusion matrix
+    
+    PCA True Positive Rate = 62.8%
+    PCA False Positive Rate = 13.8%
 ```{r}
 table(glm.pred, validation$death)
 ```
 
+# AUC for logistic reg model after PCA dimension reduction
+```{r}
+labels=factor(validation$death)
+auc(roc(glm.probs,labels))
+plot(roc(glm.probs,labels))
+```
 
 ### Predictive models
 
