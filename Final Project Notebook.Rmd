@@ -551,11 +551,10 @@ auc(roc_obj)
 
 
 
-### Predictive models
+#### Predictive models
 
-# logistic regression
-#first run accuracy = 81.0%
-
+1. Logistic regression (without Dimension reduction)
+# First run accuracy = 81.0%
 # Using binary meds and procs, accurcy is 83.2%
 
 ```{r}
@@ -570,12 +569,13 @@ val.accuracy
 #confusion matrix
 table(glm.pred, validation$death)
 ```
+
 # logistic regression summary
 ```{r}
 summary(glm.fit)
 ```
 
-#gradient boost
+2. Gradient Boosting
 # first run with n.trees=1000 and shrinkage=0.01, accuracy = 0.806
 # however, 80% of actual outcomes are 0, so this is not a skillful model
 # likely need to balance the classes between train and test sets to get better results
@@ -631,7 +631,7 @@ val.accuracy
 table(glm.pred, validation.onehot$death)
 ```
 
-#gradient boost
+# gradient boost
 # accuracy = 0.812
 # boosting still predicting very few positive outcomes
 ```{r}
@@ -651,29 +651,20 @@ val.accuracy
 table(val.pred, validation.onehot$death)
 ```
 
-#feature importance
+# feature importance
 ```{r}
 summary(boost)
 ```
 
-#compute AUC and plot ROC-AUC curve
+# compute AUC and plot ROC-AUC curve
 ```{r}
 labels=factor(validation$death)
 auc(roc(val.probs,labels))
 plot(roc(val.probs,labels))
 ```
 
-#### Predictive Model Approaches 
 
-```{r}
-set.seed(1)
-n=nrow(joined_df)
-train.i=sample(1:n, n*0.75)
-train=joined_df[train.i,]
-validation=joined_df[-train.i,]
-```
-
-2. KNN
+3. KNN
 ```{r}
 train1=as.matrix(train$n_med)
 validation1=as.matrix(validation$n_med)
@@ -683,7 +674,7 @@ table(knn_pred, validation$death)
 mean(knn_pred == validation$death)
 ```
 
-3. LDA
+4. LDA
 ```{r}
 lda_model = lda(death~., family=binomial, data=train)
 lda_pred = predict(lda_model, validation, type = "response")
@@ -692,7 +683,7 @@ print(confusion_matrix)
 mean(lda_pred$class == validation$death)
 ```
 
-4. QDA
+5. QDA
 ```{r}
 qda_model = qda(death~n_med+n_proc, family=binomial, data=train)
 qda_pred = predict(qda_model, validation, type="response")
@@ -702,7 +693,7 @@ print(confusion_matrix)
 mean(qda_pred$class == validation$death)
 ```
 
-5.Tree
+6..Tree
 ```{r}
 tree_model=tree(as.factor(death)~.,joined_df)
 summary(tree_model)
@@ -721,7 +712,7 @@ mean(val.pred==validation$death)
 
 ```
 
-6. Bagging
+7. Bagging
 ```{r}
 bag=randomForest(as.factor(death)~n_vaso, data=train, mtry=9, ntree=100, importance=TRUE)
 plot(bag)
@@ -738,7 +729,7 @@ mean(train.pred==train$death)
 mean(val.pred==validation$death)
 ```
 
-7. Random forest
+8.. Random forest
 ```{r}
 rf=randomForest(as.factor(death)~.,data=train, mtry=3, n.tree=100)
 rf
