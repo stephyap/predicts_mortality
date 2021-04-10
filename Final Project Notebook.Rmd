@@ -472,11 +472,77 @@ n=nrow(train_final)
 train.index=sample(1:n, n*0.75)
 train=train_final[train.index,]
 validation=train_final[-train.index,]
+## steph added:
+validationset = validation %>% select(-death)
 ```
 
 
 
 ### Dimension reduction
+
+1. Simple Linear Regression
+
+2. PCA 
+```{r}
+pca_train = train %>% select(-death)
+pca_validationset = validationset
+
+pca_train = as.data.frame(sapply(pca_train, as.numeric))
+pca_validationset = as.data.frame(sapply(pca_validationset, as.numeric))
+
+pca = prcomp(pca_train, scale.=TRUE)
+```
+
+```{r}
+#variance
+pr_var = (pca$sdev )^2
+
+# % of variance
+prop_varex = pr_var/ sum(pr_var)
+```
+
+```{r}
+pr_var ## eliminate tho variables that didn’t have an eigenvalue greater than 1 (last one being 81st)
+```
+
+```{r}
+#Plot
+plot( prop_varex, xlab = "Principal Component", 
+                  ylab = "Proportion of Variance Explained", type = "b" , xlim=c(0,50))
+```
+
+```{r}
+#Scree Plot
+plot( cumsum( prop_varex ), xlab = "Principal Component", 
+                            ylab = "Cumulative Proportion of Variance Explained", type = "b" )
+```
+
+```{r}
+# Create new dataset based on the PCA result aboe
+pca_new_train = data.frame(death=train$death, pca$x)
+t = as.data.frame(predict(pca, newdata=pca_validationset))
+
+new_train = pca_new_train[, 1:82]
+new_validationset = t[, 1:81]
+```
+
+#fit model on new PCA training data
+```{r}
+glm.fit=glm(death~., data=new_train, family=binomial)
+```
+#get predictions on PCA validation set
+```{r}
+glm.probs=predict(glm.fit, newdata=new_validationset, type="response") 
+glm.pred=ifelse(glm.probs>0.5, 1, 0)
+val.accuracy = mean(glm.pred==validation$death)
+val.accuracy
+```
+
+#confusion matrix
+```{r}
+table(glm.pred, validation$death)
+```
+
 
 ### Predictive models
 
@@ -591,21 +657,6 @@ plot(roc(val.probs,labels))
 ```
 
 #### Predictive Model Approaches 
-
-1. Basic logistic regression 
-```{r}
-logit <- glm(death ~ gender + race + age + los + n_med + min_days_med_adm + max_days_med_adm + any_vaso + n_vaso + n_proc + min_days_pro_adm + max_days_pro_adm, data = , family = "binomial")
-
-summary(logit)
-```
-
-```{r}
-coef(logit)
-```
-
-```{r}
-summary(logit)$coef
-```
 
 ```{r}
 set.seed(1)
