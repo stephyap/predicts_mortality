@@ -36,6 +36,7 @@ library(smotefamily)
 library(caret)
 library(AUC)
 library(pROC)
+library(lda)
 ```
 
 ```{r message=FALSE}
@@ -50,19 +51,10 @@ proc_train <- read_csv("procedure_train.csv")
 demo_train <- demo_train %>% 
   mutate(New_admitted_dt_tm = anytime(New_admitted_dt_tm), ## anytime() Parse POSIXct or Date objects from input data
          New_discharge_dt_tm = anytime(New_discharge_dt_tm))
-# demo_te <- demo_te %>% 
-#   mutate(New_admitted_dt_tm = anytime(New_admitted_dt_tm), 
-#          New_discharge_dt_tm = anytime(New_discharge_dt_tm), 
-#          los = difftime(New_discharge_dt_tm, New_admitted_dt_tm, 
-#                         units = "days")
-#          )
 
 med_train$med_started_dt_tm <- anytime(med_train$med_started_dt_tm)
-# med_te$med_started_dt_tm <- anytime(med_te$med_started_dt_tm)
 
 proc_train$procedure_dt_tm <- anytime(proc_train$procedure_dt_tm)
-# proc_te$procedure_dt_tm <- anytime(proc_te$procedure_dt_tm)
-
 ```
 
 
@@ -106,6 +98,7 @@ med_train <- demo_train %>%
   select(patient_num, admission_date) %>% 
   right_join(med_train, by = "patient_num")
 ```
+
 ```{r}
 proc_train <- demo_train %>% 
   select(patient_num, admission_date) %>% 
@@ -115,10 +108,8 @@ proc_train <- demo_train %>%
 
 #### Rearranging columns order
 ```{r}
-# colnames(med_train)
 med_train <- med_train[,c(1,3,2,4)]
 
-# colnames(proc_train)
 proc_train <- proc_train[,c(1,3,4,2,5)]
 ```
 
@@ -332,12 +323,6 @@ med_freq
 
 DOUBLE CHECK:: We are planning to create dummy variables for each medication that had been prescribed to at least 500 patients in the dataset.
 
-#### Viewing the most used procedures in propotions 
-
-```{r}
-janitor::tabyl(med_train, generic_name) %>% arrange(desc(n)) %>% top_n(20)
-```
-
 
 #### Descriptives analysis for procedure training data
 
@@ -366,6 +351,14 @@ createTable(cg3, show.n = F)
     There's a total of 1254 procedures. The top 3 most used procedure is arteriography of cerebral arteries, minsertion of endotracheal tube followed by continuous invasive mechanical ventilation for less than 96 consecutive hours.
 
 ```{r}
+proc_freq_testing <- proc_train %>% group_by(procedure_description) %>%
+  summarise(n = n(), procedure_description = first(procedure_description)) %>%
+  arrange(desc(n)) 
+
+proc_freq_testing
+```
+
+```{r}
 proc_freq <- proc_train %>% group_by(procedure_id) %>%
   summarise(n = n(), 
             procedure_description = first(procedure_description)) %>%
@@ -374,13 +367,6 @@ proc_freq <- proc_train %>% group_by(procedure_id) %>%
 proc_freq
 ```
 
-
-#### Viewing the most used procedures in propotions 
-```{r}
-janitor::tabyl(proc_train, procedure_id) %>% arrange(desc(n)) %>% top_n(20)
-```
-
-Are any of the procedures predictive of death?
 
 #### Combining all dataframes into one by id and admission date (WHEN THE SMALLER DATASETS ARE CLEANED)
 ```{r}
@@ -445,6 +431,7 @@ save(train_final, file = "train_final.RData")
 ```{r}
 load("train_final.RData")
 ```
+
 # a quick descriptive
 ```{r}
 tb <- createTable(compareGroups(death ~. , data = train_final[, -1]))
@@ -473,15 +460,14 @@ n=nrow(train_final)
 train.index=sample(1:n, n*0.75)
 train=train_final[train.index,]
 validation=train_final[-train.index,]
-## steph added:
+## steph added (for PCA the unsupervised learning):
 validationset = validation %>% select(-death)
 ```
 
 
-
 ### Dimension reduction
 
-1. Simple Linear Regression
+1. Simple Linear Regression (Yi Yao) 
 
 2. PCA 
 ```{r}
@@ -559,6 +545,10 @@ plot(roc(glm.probs,labels))
 roc_obj <- roc(validation$death, glm.pred)
 auc(roc_obj)
 ```
+
+3. Variable Selection
+
+
 
 
 ### Predictive models
