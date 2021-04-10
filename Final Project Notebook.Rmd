@@ -35,6 +35,7 @@ library(glmnet)
 library(smotefamily)
 library(caret)
 library(AUC)
+library(pROC)
 ```
 
 ```{r message=FALSE}
@@ -530,13 +531,14 @@ new_validationset = t[, 1:81]
 ```{r}
 glm.fit=glm(death~., data=new_train, family=binomial)
 ```
-# get predictions on PCA validation set
+# get predictions on PCA validation set (83.6%)
 ```{r}
 glm.probs=predict(glm.fit, newdata=new_validationset, type="response") 
 glm.pred=ifelse(glm.probs>0.5, 1, 0)
 val.accuracy = mean(glm.pred==validation$death)
 val.accuracy
 ```
+
 
 #confusion matrix
     
@@ -552,6 +554,12 @@ labels=factor(validation$death)
 auc(roc(glm.probs,labels))
 plot(roc(glm.probs,labels))
 ```
+
+```{r}
+roc_obj <- roc(validation$death, glm.pred)
+auc(roc_obj)
+```
+
 
 ### Predictive models
 
