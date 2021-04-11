@@ -35,6 +35,9 @@ library(glmnet)
 library(smotefamily)
 library(caret)
 library(AUC)
+library(pROC)
+library(lda)
+library(superml)
 ```
 
 ```{r message=FALSE}
@@ -49,19 +52,10 @@ proc_train <- read_csv("procedure_train.csv")
 demo_train <- demo_train %>% 
   mutate(New_admitted_dt_tm = anytime(New_admitted_dt_tm), ## anytime() Parse POSIXct or Date objects from input data
          New_discharge_dt_tm = anytime(New_discharge_dt_tm))
-# demo_te <- demo_te %>% 
-#   mutate(New_admitted_dt_tm = anytime(New_admitted_dt_tm), 
-#          New_discharge_dt_tm = anytime(New_discharge_dt_tm), 
-#          los = difftime(New_discharge_dt_tm, New_admitted_dt_tm, 
-#                         units = "days")
-#          )
 
 med_train$med_started_dt_tm <- anytime(med_train$med_started_dt_tm)
-# med_te$med_started_dt_tm <- anytime(med_te$med_started_dt_tm)
 
 proc_train$procedure_dt_tm <- anytime(proc_train$procedure_dt_tm)
-# proc_te$procedure_dt_tm <- anytime(proc_te$procedure_dt_tm)
-
 ```
 
 
@@ -105,6 +99,7 @@ med_train <- demo_train %>%
   select(patient_num, admission_date) %>% 
   right_join(med_train, by = "patient_num")
 ```
+
 ```{r}
 proc_train <- demo_train %>% 
   select(patient_num, admission_date) %>% 
@@ -114,10 +109,8 @@ proc_train <- demo_train %>%
 
 #### Rearranging columns order
 ```{r}
-# colnames(med_train)
 med_train <- med_train[,c(1,3,2,4)]
 
-# colnames(proc_train)
 proc_train <- proc_train[,c(1,3,4,2,5)]
 ```
 
@@ -331,12 +324,6 @@ med_freq
 
 DOUBLE CHECK:: We are planning to create dummy variables for each medication that had been prescribed to at least 500 patients in the dataset.
 
-#### Viewing the most used procedures in propotions 
-
-```{r}
-janitor::tabyl(med_train, generic_name) %>% arrange(desc(n)) %>% top_n(20)
-```
-
 
 #### Descriptives analysis for procedure training data
 
@@ -365,6 +352,14 @@ createTable(cg3, show.n = F)
     There's a total of 1254 procedures. The top 3 most used procedure is arteriography of cerebral arteries, minsertion of endotracheal tube followed by continuous invasive mechanical ventilation for less than 96 consecutive hours.
 
 ```{r}
+proc_freq_testing <- proc_train %>% group_by(procedure_description) %>%
+  summarise(n = n(), procedure_description = first(procedure_description)) %>%
+  arrange(desc(n)) 
+
+proc_freq_testing
+```
+
+```{r}
 proc_freq <- proc_train %>% group_by(procedure_id) %>%
   summarise(n = n(), 
             procedure_description = first(procedure_description)) %>%
@@ -373,13 +368,6 @@ proc_freq <- proc_train %>% group_by(procedure_id) %>%
 proc_freq
 ```
 
-
-#### Viewing the most used procedures in propotions 
-```{r}
-janitor::tabyl(proc_train, procedure_id) %>% arrange(desc(n)) %>% top_n(20)
-```
-
-Are any of the procedures predictive of death?
 
 #### Combining all dataframes into one by id and admission date (WHEN THE SMALLER DATASETS ARE CLEANED)
 ```{r}
@@ -444,6 +432,7 @@ save(train_final, file = "train_final.RData")
 ```{r}
 load("train_final.RData")
 ```
+
 # a quick descriptive
 ```{r}
 tb <- createTable(compareGroups(death ~. , data = train_final[, -1]))
@@ -473,17 +462,101 @@ n=nrow(train_final)
 train.index=sample(1:n, n*0.75)
 train=train_final[train.index,]
 validation=train_final[-train.index,]
+## steph added (for PCA the unsupervised learning):
+validationset = validation %>% select(-death)
 ```
-
 
 
 ### Dimension reduction
 
-### Predictive models
+1. Simple Linear Regression (Yi Yao) 
 
-# logistic regression
-#first run accuracy = 81.0%
+2. PCA 
+```{r}
+pca_train = train %>% select(-death)
+pca_validationset = validationset
 
+pca_train = as.data.frame(sapply(pca_train, as.numeric))
+pca_validationset = as.data.frame(sapply(pca_validationset, as.numeric))
+
+pca = prcomp(pca_train, scale.=TRUE)
+```
+
+```{r}
+#variance
+pr_var = (pca$sdev )^2
+
+# % of variance
+prop_varex = pr_var/ sum(pr_var)
+```
+
+```{r}
+pr_var ## eliminate tho variables that didn’t have an eigenvalue greater than 1 (last one being 81st)
+```
+
+```{r}
+#Plot
+plot( prop_varex, xlab = "Principal Component", 
+                  ylab = "Proportion of Variance Explained", type = "b" , xlim=c(0,50))
+```
+
+```{r}
+#Scree Plot
+plot( cumsum( prop_varex ), xlab = "Principal Component", 
+                            ylab = "Cumulative Proportion of Variance Explained", type = "b" )
+```
+
+```{r}
+# Create new dataset based on the PCA result aboe
+pca_new_train = data.frame(death=train$death, pca$x)
+t = as.data.frame(predict(pca, newdata=pca_validationset))
+
+new_train = pca_new_train[, 1:82]
+new_validationset = t[, 1:81]
+```
+
+# fit logistic reg model on new PCA training data
+```{r}
+glm.fit=glm(death~., data=new_train, family=binomial)
+```
+# get predictions on PCA validation set (83.6%)
+```{r}
+glm.probs=predict(glm.fit, newdata=new_validationset, type="response") 
+glm.pred=ifelse(glm.probs>0.5, 1, 0)
+val.accuracy = mean(glm.pred==validation$death)
+val.accuracy
+```
+
+
+#confusion matrix
+    
+    PCA True Positive Rate = 62.8%
+    PCA False Positive Rate = 13.8%
+```{r}
+table(glm.pred, validation$death)
+```
+
+# AUC for logistic reg model after PCA dimension reduction
+```{r}
+labels=factor(validation$death)
+auc(roc(glm.probs,labels))
+plot(roc(glm.probs,labels))
+```
+
+```{r}
+roc_obj <- roc(validation$death, glm.pred)
+auc(roc_obj)
+```
+
+3. Variable Selection
+
+
+
+
+#### Predictive models
+
+1. Logistic regression (without Dimension reduction)
+# First run accuracy = 81.0%
 # Using binary meds and procs, accurcy is 83.2%
 
 ```{r}
@@ -498,12 +571,20 @@ val.accuracy
 #confusion matrix
 table(glm.pred, validation$death)
 ```
+
 # logistic regression summary
 ```{r}
 summary(glm.fit)
 ```
 
+<<<<<<< HEAD
 #### Begin BB modeling section #####
+=======
+2. Gradient Boosting
+# first run with n.trees=1000 and shrinkage=0.01, accuracy = 0.806
+# however, 80% of actual outcomes are 0, so this is not a skillful model
+# likely need to balance the classes between train and test sets to get better results
+>>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
 
 #### Gradient boost
 
@@ -699,7 +780,31 @@ table(train.balanced$death)
 table(train$death)
 ```
 
+<<<<<<< HEAD
 # Rerun xgb on balanced data
+=======
+# logistic regression on balanced data
+# accuracy = 76.3%
+# positive class recall increased from 38% to 66% by using class balanced rather than raw data
+```{r}
+train.balanced$death = as.numeric(train.balanced$death)
+
+#fit model on training data
+glm.fit=glm(death~., data=train.balanced, family=binomial)
+
+#get predictions on validation set
+glm.probs=predict(glm.fit, newdata=validation.onehot, type="response") 
+glm.pred=ifelse(glm.probs>0.5, 1, 0)
+val.accuracy = mean(glm.pred==validation.onehot$death)
+val.accuracy
+#confusion matrix
+table(glm.pred, validation.onehot$death)
+```
+
+# gradient boost
+# accuracy = 0.812
+# boosting still predicting very few positive outcomes
+>>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
 ```{r}
 #fit model
 boost.bal = gbm(death~.,data=train.balanced,distribution='bernoulli',n.trees=1000,shrinkage=0.01, interaction.depth=4, class.stratify.cv = 5)
@@ -720,13 +825,18 @@ table(val.pred, validation.onehot$death)
 auc(roc(val.probs,labels))
 ```
 
+<<<<<<< HEAD
 # random forest on balanced data
+=======
+# feature importance
+>>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
 ```{r}
 #set values for mtry (number of predictors sampled for spliting at each node)
 p = dim(train)[2]-1 #p=13
 p2 = p/2
 p_sqrt = sqrt(p)
 
+<<<<<<< HEAD
 # create x and y training and test sets
 x.train = train.balanced[,-244]
 y.train = as.factor(train.balanced$death)
@@ -757,35 +867,18 @@ rf.p2$test$confusion # Confusion matrix
 ### Compute AUC and plot ROC-AUC curve ###
 auc(roc(rf.p2$test$votes[,2],y.val)) #get AUC score
 #plot(roc(rf.p2$test$votes[,2],y.test)) #plot ROC-AUC curve
+=======
+# compute AUC and plot ROC-AUC curve
+```{r}
+labels=factor(validation$death)
+auc(roc(val.probs,labels))
+plot(roc(val.probs,labels))
+>>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
 ```
 #### end BB section #######
 
-#### Predictive Model Approaches 
 
-1. Basic logistic regression 
-```{r}
-logit <- glm(death ~ gender + race + age + los + n_med + min_days_med_adm + max_days_med_adm + any_vaso + n_vaso + n_proc + min_days_pro_adm + max_days_pro_adm, data = , family = "binomial")
-
-summary(logit)
-```
-
-```{r}
-coef(logit)
-```
-
-```{r}
-summary(logit)$coef
-```
-
-```{r}
-set.seed(1)
-n=nrow(joined_df)
-train.i=sample(1:n, n*0.75)
-train=joined_df[train.i,]
-validation=joined_df[-train.i,]
-```
-
-2. KNN
+3. KNN
 ```{r}
 train1=as.matrix(train$n_med)
 validation1=as.matrix(validation$n_med)
@@ -795,7 +888,7 @@ table(knn_pred, validation$death)
 mean(knn_pred == validation$death)
 ```
 
-3. LDA
+4. LDA
 ```{r}
 lda_model = lda(death~., family=binomial, data=train)
 lda_pred = predict(lda_model, validation, type = "response")
@@ -804,7 +897,7 @@ print(confusion_matrix)
 mean(lda_pred$class == validation$death)
 ```
 
-4. QDA
+5. QDA
 ```{r}
 qda_model = qda(death~n_med+n_proc, family=binomial, data=train)
 qda_pred = predict(qda_model, validation, type="response")
@@ -814,7 +907,7 @@ print(confusion_matrix)
 mean(qda_pred$class == validation$death)
 ```
 
-5.Tree
+6..Tree
 ```{r}
 tree_model=tree(as.factor(death)~.,joined_df)
 summary(tree_model)
@@ -833,7 +926,7 @@ mean(val.pred==validation$death)
 
 ```
 
-6. Bagging
+7. Bagging
 ```{r}
 bag=randomForest(as.factor(death)~n_vaso, data=train, mtry=9, ntree=100, importance=TRUE)
 plot(bag)
@@ -850,7 +943,7 @@ mean(train.pred==train$death)
 mean(val.pred==validation$death)
 ```
 
-7. Random forest
+8.. Random forest
 ```{r}
 rf=randomForest(as.factor(death)~.,data=train, mtry=3, n.tree=100)
 rf
