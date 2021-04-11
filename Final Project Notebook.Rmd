@@ -461,7 +461,8 @@ train_final$death = as.integer(as.logical(train_final$death))
 ```
 
 ```{r}
-train_final = train_final %>% select(-patient_num, -los)
+#train_final = train_final %>% select(-patient_num, -los)
+train_final = subset(train_final, select=-c(patient_num, los))
 ```
 
 
@@ -502,15 +503,37 @@ table(glm.pred, validation$death)
 summary(glm.fit)
 ```
 
-#gradient boost
-# first run with n.trees=1000 and shrinkage=0.01, accuracy = 0.806
-# however, 80% of actual outcomes are 0, so this is not a skillful model
-# likely need to balance the classes between train and test sets to get better results
+#### Begin BB modeling section #####
 
-# use the binary meds or proc variable, we get 0.817
+#### Gradient boost
+
+### grid search cv (Runtime of this block 1-2 hours)
+```{r}
+#make dummy vars from categorical vars
+train.dummy = dummyVars("~.",data=train)
+train.onehot = data.frame(predict(train.dummy,newdata=train))
+validation.dummy = dummyVars("~.",data=validation)
+validation.onehot = data.frame(predict(validation.dummy,newdata=validation))
+
+xgb <- XGBTrainer$new(objective = "binary:logistic", eval_metric = 'auc')
+
+gst <-GridSearchCV$new(trainer = xgb,
+                             parameters = list(n_estimators = c(100,500,1000), 
+                                               learning_rate = c(.01,.1,.5),
+                                               max_depth = c(2,4,6),
+                                               subsample= c(0.5,1)
+                                               ),
+                             n_folds = 10,
+                             scoring = c('auc'))
+gst$fit(train.onehot, "death")
+gst$best_iteration()
+```
+
+# XGBoost model run on all features using optimized hyperparameters from grid search cv
 ```{r}
 #fit model
-boost = gbm(death~.,data=train,distribution='bernoulli',n.trees=1000,shrinkage=0.01)
+boost = gbm(death~.,data=train,distribution='bernoulli',n.trees=1000,shrinkage=0.01, interaction.depth=4,
+            class.stratify.cv = 5)
 #get predicted probabilities
 train.probs = predict(boost, train, n.trees = 1000)
 val.probs = predict(boost, validation, n.trees = 1000)
@@ -520,18 +543,154 @@ val.pred=ifelse(val.probs>0.5, 1,0)
 #get accuracy 
 train.accuracy = mean(train.pred==train$death)
 val.accuracy = mean(val.pred==validation$death)
+train.accuracy
 val.accuracy
 #confusion matrix
 table(val.pred, validation$death)
+#auc
+auc(roc(val.probs,labels))
+```
+#XGboost full model feature importance
+```{r}
+summary(boost)
 ```
 
+#XGBoost backward feature selection
+```{r}
+#get list of top features from model summary
+boost.top.features = summary(boost)[,1:2]
+boost.top.features = gsub('`','',boost.top.features[,1])
+
+n.features=seq(230,10,-20) #defines range of number of features to test
+boost.auc=rep(0,length(n.features)) #empty array to add results
+
+#run Boost model with reduced feature sets using each value in n.features
+for(i in 1:length(n.features)){
+  boost.reduced = gbm(death~.,data=train[,c('death',boost.top.features[1:n.features[i]])],distribution='bernoulli',n.trees=1000,shrinkage=0.01, interaction.depth=4, class.stratify.cv = 5)
+  val.probs = predict(boost.reduced, validation[,c('death',boost.top.features[1:n.features[i]])], n.trees = 1000)
+  boost.auc[i] = auc(roc(val.probs,labels))
+}
+#plot AUC vs. n.features
+plot(n.features,boost.auc,type="b", xlim=rev(range(n.features)))
+```
+
+#fit Boost final model with optimized n.features (n=70)
+```{r}
+#fit model
+boost.final = gbm(death~.,data=train[,c('death',boost.top.features[1:70])],distribution='bernoulli',n.trees=1000,shrinkage=0.01, interaction.depth=4,
+            class.stratify.cv = 5)
+#get predicted probabilities
+train.probs = predict(boost.final, train[,c('death',boost.top.features[1:70])], n.trees = 1000)
+val.probs = predict(boost.final, validation[,c('death',boost.top.features[1:70])], n.trees = 1000)
+#get binary predictions
+train.pred=ifelse(train.probs>0.5, 1, 0)
+val.pred=ifelse(val.probs>0.5, 1,0)
+#get accuracy 
+train.accuracy = mean(train.pred==train$death)
+val.accuracy = mean(val.pred==validation$death)
+train.accuracy
+val.accuracy
+#confusion matrix
+table(val.pred, validation$death)
+#auc
+labels=factor(validation$death)
+auc(roc(val.probs,labels))
+plot(roc(val.probs,labels))
+```
+
+#Boost final model feature importance
+```{r}
+summary(boost.final)
+```
+
+
+### Random Forest
+
+#### Fit random forest using grid search cv to find optimized hyperparameters
+```{r}
+rf <- RFTrainer$new(classification=1,verbose=FALSE)
+
+gsrf <-GridSearchCV$new(trainer = rf,
+                             parameters = list(n_estimators = c(10,100,300,500),
+                                               max_features = c(3,15,60,120)
+                                               ),
+                             n_folds = 5,
+                             scoring = c('auc'))
+gsrf$fit(X=train.onehot, y="death")
+gsrf$best_iteration()
+```
+
+# Fit full random forest model using optimized hyperparameters
+```{r}
+# create x and y training and test sets
+x.train = train[,-4]
+y.train = as.factor(train$death)
+x.val = validation[,-4]
+y.val = as.factor(validation$death)
+
+#fit random forest for each value of mtry
+rf.p2=randomForest(x.train, y.train, xtest = x.val, ytest = y.val, mtry = 15, ntree = 100)
+
+#plot test error for each model
+plot(1:100, rf.p2$test$err.rate[,1], col = "red", type = "l", xlab = "Number of Trees", ylab = "Test Err Rate", ylim = c(.15, .25),main='Test Error Rate vs. Number of Trees')
+
+# Evaluate model accuracy
+#rf.p2$test$err.rate #Shows error % at each of 500 trees 
+rf.p2$test$confusion # Confusion matrix
+#rf.p2$test$votes #Gives predicted probability for each sample in test set
+#rf.p2$test$votes[,2] #Gives predicted probability for y=1
+
+#get feature importance 
+rf.top.features = importance(rf.p2)
+#varImpPlot(rf.p2)
+
+### Compute AUC and plot ROC-AUC curve ###
+auc(roc(rf.p2$test$votes[,2],y.val)) #get AUC score
+#plot(roc(rf.p2$test$votes[,2],y.test)) #plot ROC-AUC curve
+```
+#RF backward feature selection
+```{r}
+#get list of top features from model summary
+rf.top.features = importance(rf.p2)
+rf.top.features=as.data.frame(rf.top.features)
+rf.top.features = cbind(feature = rownames(rf.top.features), rf.top.features)
+rf.top.features = rf.top.features[order(-rf.top.features[,2]),]
+
+n.features=seq(230,10,-20) #defines range of number of features to test
+rf.auc=rep(0,length(n.features)) #empty array to add results
+
+#run Boost model with reduced feature sets using each value in n.features
+for(i in 1:length(n.features)){
+  rf.reduced = randomForest(x.train[,c(rf.top.features[,1][1:n.features[i]])], y.train, 
+                            xtest = x.val[,c(rf.top.features[,1][1:n.features[i]])], ytest = y.val, mtry = 15, ntree = 100)
+  rf.auc[i] = auc(roc(rf.reduced$test$votes[,2],y.val))
+}
+#plot AUC vs. n.features
+plot(n.features,rf.auc,type="b", xlim=rev(range(n.features)))
+```
+# Fit reduced random forest model with optimized n.features=110
+```{r}
+#fit random forest
+rf.reduced=randomForest(x.train[,c(rf.top.features[,1][1:110])], y.train, 
+                   xtest = x.val[,c(rf.top.features[,1][1:110])], ytest = y.val, 
+                   mtry = 15, ntree = 100)
+
+#plot test error for each model
+plot(1:100, rf.reduced$test$err.rate[,1], col = "red", type = "l", xlab = "Number of Trees", ylab = "Test Err Rate", ylim = c(.15, .25),main='Test Error Rate vs. Number of Trees')
+
+# Evaluate model accuracy
+rf.reduced$test$confusion # Confusion matrix
+
+#get feature importance 
+rf.top.features.reduced = importance(rf.reduced)
+#varImpPlot(rf.p2)
+
+### Compute AUC ###
+auc(roc(rf.p2$test$votes[,2],y.val)) #get AUC score
+```
+#### SMOTE for unbalanced classes
 # oversampling to balance classes
 ```{r}
-#make dummy vars from categorical vars
-train.dummy = dummyVars("~.",data=train)
-train.onehot = data.frame(predict(train.dummy,newdata=train))
-validation.dummy = dummyVars("~.",data=validation)
-validation.onehot = data.frame(predict(validation.dummy,newdata=validation))
 #SMOTE to balance classes - training set only
 train.balanced = SMOTE(X=train.onehot[,-8],target=train.onehot[,8])
 train.balanced = train.balanced$data
@@ -540,55 +699,66 @@ table(train.balanced$death)
 table(train$death)
 ```
 
-# logistic regression on balanced data
-# accuracy = 76.3%
-# positive class recall increased from 38% to 66% by using class balanced rather than raw data
-```{r}
-train.balanced$death = as.numeric(train.balanced$death)
-
-#fit model on training data
-glm.fit=glm(death~., data=train.balanced, family=binomial)
-
-#get predictions on validation set
-glm.probs=predict(glm.fit, newdata=validation.onehot, type="response") 
-glm.pred=ifelse(glm.probs>0.5, 1, 0)
-val.accuracy = mean(glm.pred==validation.onehot$death)
-val.accuracy
-#confusion matrix
-table(glm.pred, validation.onehot$death)
-```
-
-#gradient boost
-# accuracy = 0.812
-# boosting still predicting very few positive outcomes
+# Rerun xgb on balanced data
 ```{r}
 #fit model
-boost = gbm(death~.,data=train.balanced,distribution='bernoulli',n.trees=1000,shrinkage=0.01)
+boost.bal = gbm(death~.,data=train.balanced,distribution='bernoulli',n.trees=1000,shrinkage=0.01, interaction.depth=4, class.stratify.cv = 5)
 #get predicted probabilities
-train.probs = predict(boost, train.balanced, n.trees = 1000)
-val.probs = predict(boost, validation.onehot, n.trees = 1000)
+train.probs = predict(boost.bal, train.balanced, n.trees = 1000)
+val.probs = predict(boost.bal, validation.onehot, n.trees = 1000)
 #get binary predictions
 train.pred=ifelse(train.probs>0.5, 1, 0)
 val.pred=ifelse(val.probs>0.5, 1,0)
 #get accuracy 
 train.accuracy = mean(train.pred==train.balanced$death)
 val.accuracy = mean(val.pred==validation.onehot$death)
+train.accuracy
 val.accuracy
 #confusion matrix
 table(val.pred, validation.onehot$death)
-```
-
-#feature importance
-```{r}
-summary(boost)
-```
-
-#compute AUC and plot ROC-AUC curve
-```{r}
-labels=factor(validation$death)
+#auc
 auc(roc(val.probs,labels))
-plot(roc(val.probs,labels))
 ```
+
+# random forest on balanced data
+```{r}
+#set values for mtry (number of predictors sampled for spliting at each node)
+p = dim(train)[2]-1 #p=13
+p2 = p/2
+p_sqrt = sqrt(p)
+
+# create x and y training and test sets
+x.train = train.balanced[,-244]
+y.train = as.factor(train.balanced$death)
+x.val = validation.onehot[,-244]
+y.val = as.factor(validation.onehot$death)
+
+#fit random forest for each value of mtry
+rf.p=randomForest(x.train, y.train, xtest = x.val, ytest = y.val, mtry = p, ntree = 100)
+rf.p2=randomForest(x.train, y.train, xtest = x.val, ytest = y.val, mtry = p2, ntree = 100)
+rf.p_sqrt=randomForest(x.train, y.train, xtest = x.val, ytest = y.val, mtry = p_sqrt, ntree = 100)
+
+#plot test error for each model
+plot(1:100, rf.p$test$err.rate[,1], col = "red", type = "l", xlab = "Number of Trees", ylab = "Test Error Rate", ylim = c(.15, .30))
+lines(1:100, rf.p2$test$err.rate[,1], col = "blue", type = "l")
+lines(1:100, rf.p_sqrt$test$err.rate[,1], col = "green", type = "l")
+legend("topright", c("m=p", "m=p/2", "m=sqrt(p)"), col = c("red", "blue", "green"), cex = 1, lty = 1)
+
+# Evaluate model accuracy
+#rf.p2$test$err.rate #Shows error % at each of 500 trees 
+rf.p2$test$confusion # Confusion matrix
+#rf.p2$test$votes #Gives predicted probability for each sample in test set
+#rf.p2$test$votes[,2] #Gives predicted probability for y=1
+
+#get feature importance 
+#importance(rf.p2)
+#varImpPlot(rf.p2)
+
+### Compute AUC and plot ROC-AUC curve ###
+auc(roc(rf.p2$test$votes[,2],y.val)) #get AUC score
+#plot(roc(rf.p2$test$votes[,2],y.test)) #plot ROC-AUC curve
+```
+#### end BB section #######
 
 #### Predictive Model Approaches 
 
