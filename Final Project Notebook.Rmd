@@ -779,9 +779,7 @@ table(train.balanced$death)
 table(train$death)
 ```
 
-<<<<<<< HEAD
 # Rerun xgb on balanced data
-=======
 # logistic regression on balanced data
 # accuracy = 76.3%
 # positive class recall increased from 38% to 66% by using class balanced rather than raw data
@@ -803,7 +801,7 @@ table(glm.pred, validation.onehot$death)
 # gradient boost
 # accuracy = 0.812
 # boosting still predicting very few positive outcomes
->>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
+#### >>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
 ```{r}
 #fit model
 boost.bal = gbm(death~.,data=train.balanced,distribution='bernoulli',n.trees=1000,shrinkage=0.01, interaction.depth=4, class.stratify.cv = 5)
@@ -824,18 +822,16 @@ table(val.pred, validation.onehot$death)
 auc(roc(val.probs,labels))
 ```
 
-<<<<<<< HEAD
 # random forest on balanced data
-=======
 # feature importance
->>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
+#### >>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
 ```{r}
 #set values for mtry (number of predictors sampled for spliting at each node)
 p = dim(train)[2]-1 #p=13
 p2 = p/2
 p_sqrt = sqrt(p)
 
-<<<<<<< HEAD
+
 # create x and y training and test sets
 x.train = train.balanced[,-244]
 y.train = as.factor(train.balanced$death)
@@ -866,25 +862,22 @@ rf.p2$test$confusion # Confusion matrix
 ### Compute AUC and plot ROC-AUC curve ###
 auc(roc(rf.p2$test$votes[,2],y.val)) #get AUC score
 #plot(roc(rf.p2$test$votes[,2],y.test)) #plot ROC-AUC curve
-=======
+```
 # compute AUC and plot ROC-AUC curve
 ```{r}
 labels=factor(validation$death)
 auc(roc(val.probs,labels))
 plot(roc(val.probs,labels))
->>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
+#### >>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
 ```
-#### end BB section #######
 
 
 4. KNN
 ```{r}
-train1=as.matrix(train$n_med)
-validation1=as.matrix(validation$n_med)
-set.seed(1)
-knn_pred=knn(train1, validation1, train$death, k=1, prob=T, use.all = FALSE)
-table(knn_pred, validation$death)
-mean(knn_pred == validation$death)
+set.seed(3)
+knn_pred=knn(train, validation, train$death, k=1, prob=T, use.all = FALSE)
+table(knn_pred, validation.reduced$death)
+mean(knn_pred == validation.reduced$death)
 ```
 
 5. LDA
@@ -906,58 +899,23 @@ print(confusion_matrix)
 mean(qda_pred$class == validation$death)
 ```
 
-7..Tree
+7.Tree
 ```{r}
-tree_model=tree(as.factor(death)~.,joined_df)
-summary(tree_model)
-plot(tree_model)
-text(tree_model,pretty=0)
-tree_model
-train.pred = predict(tree_model, train, type="class")
-val.pred = predict(tree_model, validation,type="class")
-#get binary predictions
-confusion_matrix = table(train.pred, train$death)
-print(confusion_matrix)
-confusion_matrix1 = table(val.pred, validation$death)
-print(confusion_matrix1)
-mean(train.pred==train$death)
-mean(val.pred==validation$death)
+#Classification Tree with rpart
+library(rpart)
+# grow tree
+fit <- rpart(death~., data=train, method='class')
+printcp(fit) # display the results
+plotcp(fit) # visualize cross-validation results
+summary(fit) # detailed summary of splits
 
+# plot tree
+plot(fit, uniform=TRUE,
+   main="Classification Tree for Death")
+text(fit, use.n=TRUE, all=TRUE, cex=.8)
 ```
 
-8. Bagging
-```{r}
-bag=randomForest(as.factor(death)~n_vaso, data=train, mtry=9, ntree=100, importance=TRUE)
-plot(bag)
-bag
-train.p = predict(bag, train, type="prob")
-# train.p
-val.p = predict(bag, validation, type= "prob")
-# val.p
-#predictions
-train.pred=ifelse(train.p>0.5, 1, 0)
-val.pred=ifelse(val.p>0.5, 1,0)
-#accuracy
-mean(train.pred==train$death)
-mean(val.pred==validation$death)
-```
-
-9. Random forest
-```{r}
-rf=randomForest(as.factor(death)~.,data=train, mtry=3, n.tree=100)
-rf
-train.p = predict(rf, train,type= "prob")
-val.p = predict(rf, validation,type= "prob")
-
-#predictions
-train.pred=ifelse(train.p>0.5, 1, 0)
-val.pred=ifelse(val.p>0.5, 1,0)
-#accuracy
-mean(train.pred==train$death)
-mean(val.pred==validation$death)
-```
-
-10. Lasso 
+8. Lasso 
 
 ```{r}
 # move death to the last column
@@ -1023,3 +981,6 @@ table(predicted.classes, test.data$death)
 roc_obj <- roc(test.data$death, predicted.classes)
 auc(roc_obj)
 ```
+
+
+
