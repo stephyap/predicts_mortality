@@ -225,7 +225,6 @@ cg.new <- compareGroups(death ~ gender+race+age+los,
 createTable(cg.new, show.n = F, show.p.overall = T)
 ```
 
-
 ```{r}
 # library(mice)
 # demo.tmp2
@@ -459,14 +458,12 @@ n=nrow(train_final)
 train.index=sample(1:n, n*0.75)
 train=train_final[train.index,]
 validation=train_final[-train.index,]
-## steph added (for PCA the unsupervised learning):
-validationset = validation %>% select(-death)
 ```
 
 
 ### Dimension reduction
 
-#### Variable Selection - Simple logistic regression
+#### Variable Selection
 ```{r}
 var.names <- names(train_final)[-which(names(train_final) == "death")]
 var.pvalues <- foreach(i = 1:length(var.names), .combine = c) %do% {
@@ -494,7 +491,6 @@ save(var.sig, file = "var.sig.RData")
 ```
 
 
-
 ### Predictive models
 
 1. Logistic regression (without Dimension reduction)
@@ -504,7 +500,6 @@ save(var.sig, file = "var.sig.RData")
 ```{r}
 #fit model on training data
 glm.fit=glm(death~., data=train, family=binomial)
-
 #get predictions on validation set
 glm.probs=predict(glm.fit, newdata=validation, type="response") 
 glm.pred=ifelse(glm.probs>0.5, 1, 0)
@@ -522,6 +517,64 @@ summary(glm.fit)
 
 2. Logistic Regression (with Reduced variables - names in "var.sig.RDate")
 
+#renaming some column names
+# get names from var.sig in a list : dput(as.character(var.sig$names))
+```{r}
+#renaming some column names
+# get names from var.sig in a list : dput(as.character(var.sig$names))
+
+edited_var <- c("141", "44", "norepinephrine", "age", "2549", "ondansetron", 
+"154650", "nimodipine", "122879", "2548", "any_vaso", "piperacillin-tazobactam", 
+"hydralazine", "heparin", "lidocaine", "ocular lubricant", "dopamine", 
+"fentanyl", "glucose", "n_vaso", "docusate", "labetalol", "etomidate", 
+"mannitol", "min_days_med_adm", "43", "4852", "codeine", "hydromorphone", 
+"sodium bicarbonate", "lvp solution with hypertonic saline", 
+"cefepime", "310", "4631", "3006", "lorazepam", "acetaminophen-oxycodone", 
+"chlorhexidine topical", "succinylcholine", "apap/butalbital/caffeine", 
+"161794", "161793", "min_days_pro_adm", "4756", "sterile water", 
+"albuterol-ipratropium", "ipratropium", "141780", "protamine", 
+"levofloxacin", "n_proc", "acetaminophen-hydrocodone", "levetiracetam", 
+"vancomycin", "metoclopramide", "potassium phosphate-sodium phosphate", 
+"ceftriaxone", "promethazine", "nicardipine", "max_days_med_adm", 
+"337", "lvp solution with potassium", "lvp solution", "glucagon", 
+"vecuronium", "oxycodone", "2232", "glycopyrrolate", "dexamethasone", 
+"calcium chloride", "42", "sodium chloride", "diphenhydramine", 
+"propofol", "ketorolac", "157534", "magnesium sulfate", "phytonadione", 
+"acetaminophen", "digoxin", "neostigmine", "verapamil", "356", 
+"simvastatin", "ranitidine", "159871", "284", "albuterol", 
+"methylprednisolone", "pravastatin", "insulin regular", "midazolam", 
+"meperidine", "sugammadex", "morphine", "clindamycin", "senna", 
+"furosemide", "5097", "606", "2610", "aspirin", "phenytoin", 
+"remifentanil", "papaverine", "insulin aspart-insulin aspart protamine", 
+"90", "calcium carbonate", "hydrochlorothiazide", "clonidine", 
+"docusate-senna", "indocyanine green", "iopamidol", "155690", 
+"prochlorperazine", "157536", "acetaminophen-codeine", "nicotine", 
+"n_med", "calcium gluconate", "157076", "620", "race", "sufentanil", 
+"insulin lispro", "bisacodyl", "iodixanol", "eptifibatide", "losartan", 
+"159447", "zolpidem", "158020", "157074", "lisinopril", "110148", 
+"esmolol", "dolasetron", "al hydroxide/mg hydroxide/simethicone", 
+"gender", "84", "heparin flush", "fluticasone nasal", "amlodipine", 
+"98597", "cefazolin", "rosuvastatin", "lidocaine topical")
+```
+
+```{r}
+train.reduced <- train %>% select(edited_var,death)
+validation.reduced <- validation %>% select(edited_var,death)
+glm.fit_reduced=glm(death~., data=train.reduced, family=binomial)
+
+#get predictions on validation set
+glm.probs=predict(glm.fit_reduced, newdata=validation.reduced, type="response") 
+glm.pred=ifelse(glm.probs>0.5, 1, 0)
+val.accuracy = mean(glm.pred==validation.reduced$death)
+val.accuracy
+#confusion matrix
+table(glm.pred, validation.reduced$death)
+```
+
+```{r}
+roc_obj <- roc(validation.reduced$death, glm.pred)
+auc(roc_obj)
+```
 
 <<<<<<< HEAD
 #### Begin BB modeling section #####
