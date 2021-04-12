@@ -1,0 +1,204 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(dplyr)
+library(readr)
+library(tidyr)
+library(lubridate)
+library(ggplot2)
+library(anytime)
+library(compareGroups)
+library(tidyverse)
+library(janitor)
+library(randomForest)
+library(gbm)
+library(glmnet)
+library(smotefamily)
+library(caret)
+library(AUC)
+library(MASS)
+library(doParallel)
+
+```
+
+```{r}
+source("data_prep_func.R")
+train_final <- prepData()
+dim(train_final)
+```
+
+#### Simple logistic regression
+```{r}
+var.names <- names(train_final)[-which(names(train_final) == "death")]
+var.pvalues <- foreach(i = 1:length(var.names), .combine = c) %do% {
+  fmla <- as.formula(paste0("death~", var.names[i]))
+  fit <- glm(fmla, data = train_final, family = binomial)
+  s <- summary(fit)
+  s$coefficients[2,4]
+}
+```
+
+```{r}
+var.df <- data.frame(names = var.names, pval = var.pvalues)
+```
+
+```{r}
+# var.sig.level005 <- var.df %>% filter(pval <= 0.05) %>% arrange(pval)
+var.sig <- var.df %>% filter(pval <= 0.1) %>% arrange(pval)
+```
+
+```{r}
+head(var.sig, 50)
+```
+```{r}
+save(var.sig, file = "var.sig.RData")
+```
+
+
+
+```{r}
+init.model <- glm(death ~ race + age + any_vaso + n_vaso + n_proc, 
+                  family = binomial, 
+                  data = train_final)
+```
+
+```{r}
+train_sig <- train_final %>% dplyr::select(death, any_of(var.sig$names))
+full.model <- glm(death~., family = binomial, data = train_sig)
+```
+
+```{r}
+set.seed(123)
+forwards = step(init.model,
+scope=list(lower=formula(init.model),upper=formula(full.model)), direction="forward")
+```
+
+```{r}
+save(forwards, file = "forwards.RData")
+```
+
+```{r}
+forwards.sum <- summary(forwards)
+```
+
+```{r}
+selected <- forwards.sum$coefficients
+```
+
+
+```{r}
+forwards$formula
+```
+
+```{r}
+sel1 <- names(selected[,1])
+sel1
+```
+```{r}
+sel2 <- names(selected[,1][which(selected[,4] < 0.05)])
+sel2
+```
+```{r}
+fmla1 <- as.formula(paste0("death~", paste(sel2[-1], collapse = "+")))
+```
+
+
+```{r}
+fmla2 <- as.formula(paste0("death~", paste(c("race", "any_vaso", sel1[-c(1:3,5)]), collapse = "+")))
+```
+
+
+#split training data into training and validation sets
+```{r}
+set.seed(3)
+n=nrow(train_final)
+train.index=sample(1:n, n*0.75)
+train=train_final[train.index,]
+validation=train_final[-train.index,]
+```
+
+```{r}
+#fit model on training data
+glm.fit=glm(fmla2, data=train, family=binomial)
+
+#get predictions on validation set
+glm.probs=predict(glm.fit, newdata=validation, type="response") 
+glm.pred=ifelse(glm.probs>0.5, 1, 0)
+val.accuracy = mean(glm.pred==validation$death)
+val.accuracy
+#confusion matrix
+table(glm.pred, validation$death)
+```
+
+
+```{r}
+glm.roc <- rocit(score = glm.probs, class = validation$death)
+plot(glm.roc, values = T, YIndex = F, legend = F)
+legend("bottomright", legend = paste0("AUC = ", round(glm.roc$AUC, 3)), 
+       bty = "n")
+```
+
+
+### Gradient boosting
+
+```{r}
+# for reproducibility
+set.seed(123)
+
+train$any_vaso <- as.numeric(train$any_vaso)
+
+# train GBM model
+gbm.fit <- gbm(
+  formula = fmla2,
+  distribution = "bernoulli",
+  data = train,
+  n.trees = 1000,
+  interaction.depth = 1,
+  shrinkage = 0.1,
+  n.minobsinnode = 10, 
+  cv.folds = 5,
+  n.cores = NULL, # will use all cores by default
+  verbose = FALSE
+  )  
+
+```
+
+```{r}
+gbm.pred = predict(gbm.fit, newdata = validation, n.trees = gbm.fit$n.trees)
+```
+
+
+```{r}
+gbm.roc <- rocit(score = gbm.pred, class = validation$death)
+plot(gbm.roc, values = T, YIndex = F, legend = F)
+legend("bottomright", legend = paste0("AUC = ", round(gbm.roc$AUC, 3)), 
+       bty = "n")
+```
+
+```{r fig.height=8, fig.width=4}
+gbm.importance = summary.gbm(gbm.fit, plotit = T)
+```
+
+
+### Plot multiple ROC curves
+```{r}
+library(ROCR)
+# List of predictions
+preds_list <- list(dt_preds, bag_preds, rf_preds, gbm_preds)
+
+# List of actual values (same for all)
+m <- length(preds_list)
+actuals_list <- rep(list(credit_test$default), m)
+
+# Plot the ROC curves
+pred <- prediction(preds_list, actuals_list)
+rocs <- performance(pred, "tpr", "fpr")
+plot(rocs, col = as.list(1:m), main = "Test Set ROC Curves")
+legend(x = "bottomright", 
+       legend = c("Decision Tree", "Bagged Trees", "Random Forest", "GBM"),
+       fill = 1:m)
+```
+
