@@ -142,9 +142,6 @@ proc_train <- proc_train %>%
 ```
 
 
-
-
-
 #### Checking Missingness
 
     No missing data in all three training datasets. 
@@ -469,91 +466,7 @@ validationset = validation %>% select(-death)
 
 ### Dimension reduction
 
-1. Simple Linear Regression (Yi Yao) 
-
-2. PCA 
-```{r}
-pca_train = train %>% select(-death)
-pca_validationset = validationset
-
-pca_train = as.data.frame(sapply(pca_train, as.numeric))
-pca_validationset = as.data.frame(sapply(pca_validationset, as.numeric))
-
-pca = prcomp(pca_train, scale.=TRUE)
-```
-
-```{r}
-#variance
-pr_var = (pca$sdev )^2
-
-# % of variance
-prop_varex = pr_var/ sum(pr_var)
-```
-
-```{r}
-pr_var ## eliminate tho variables that didn’t have an eigenvalue greater than 1 (last one being 81st)
-```
-
-```{r}
-#Plot
-plot( prop_varex, xlab = "Principal Component", 
-                  ylab = "Proportion of Variance Explained", type = "b" , xlim=c(0,50))
-```
-
-```{r}
-#Scree Plot
-plot( cumsum( prop_varex ), xlab = "Principal Component", 
-                            ylab = "Cumulative Proportion of Variance Explained", type = "b" )
-```
-
-```{r}
-# Create new dataset based on the PCA result aboe
-pca_new_train = data.frame(death=train$death, pca$x)
-t = as.data.frame(predict(pca, newdata=pca_validationset))
-
-new_train = pca_new_train[, 1:82]
-new_validationset = t[, 1:81]
-```
-
-# fit logistic reg model on new PCA training data
-```{r}
-glm.fit=glm(death~., data=new_train, family=binomial)
-```
-# get predictions on PCA validation set (83.6%)
-```{r}
-glm.probs=predict(glm.fit, newdata=new_validationset, type="response") 
-glm.pred=ifelse(glm.probs>0.5, 1, 0)
-val.accuracy = mean(glm.pred==validation$death)
-val.accuracy
-```
-
-
-#confusion matrix
-    
-    PCA True Positive Rate = 62.8%
-    PCA False Positive Rate = 13.8%
-```{r}
-table(glm.pred, validation$death)
-```
-
-# AUC for logistic reg model after PCA dimension reduction
-```{r}
-labels=factor(validation$death)
-auc(roc(glm.probs,labels))
-plot(roc(glm.probs,labels))
-```
-
-```{r}
-roc_obj <- roc(validation$death, glm.pred)
-auc(roc_obj)
-```
-
-3. Variable Selection
-
-
-
-
-#### Predictive models
+### Predictive models
 
 1. Logistic regression (without Dimension reduction)
 # First run accuracy = 81.0%
@@ -956,4 +869,71 @@ val.pred=ifelse(val.p>0.5, 1,0)
 #accuracy
 mean(train.pred==train$death)
 mean(val.pred==validation$death)
+```
+
+9. Lasso 
+
+```{r}
+# move death to the last column
+train.data <- train %>% relocate(death, .after=last_col())
+test.data <- validation %>% relocate(death, .after=last_col())
+```
+
+```{r}
+x <- model.matrix(death~., train.data)[,-1]
+y <- (train.data$death)
+```
+
+# fit the lasso penalized regression model 
+```{r}
+#fit the lasso penalized regression model
+set.seed(3) 
+cv.lasso <- cv.glmnet(x, y, alpha = 1, family = "binomial")
+```
+
+# compute the final lasso model using lambda.min (Accuracy: 0.8198198):
+```{r}
+# compute the final model using lambda.min:
+# Final model with lambda.min
+lasso.model <- glmnet(x, y, alpha = 1, family = "binomial",
+                      lambda = cv.lasso$lambda.min)
+# Make prediction on test data
+x.test <- model.matrix(death ~., test.data)[,-1]
+probabilities <- lasso.model %>% predict(newx = x.test)
+predicted.classes <- ifelse(probabilities > 0.5, 1, 0)
+# Model accuracy
+observed.classes <- test.data$death
+mean(predicted.classes == observed.classes) 
+```
+```{r}
+table(predicted.classes, test.data$death)
+```
+
+# Lasso with lambda.min (AUC = 0.5729)
+```{r}
+roc_obj <- roc(test.data$death, predicted.classes)
+auc(roc_obj)
+```
+
+# compute the final model using lambda.lse (Accuracy: 0.8098098):
+```{r}
+# Final model with lambda.1se
+lasso.model <- glmnet(x, y, alpha = 1, family = "binomial",
+                      lambda = cv.lasso$lambda.1se)
+# Make prediction on test data
+x.test <- model.matrix(death ~., test.data)[,-1]
+probabilities <- lasso.model %>% predict(newx = x.test)
+predicted.classes <- ifelse(probabilities > 0.5, 1, 0)
+# Model accuracy rate
+observed.classes <- test.data$death
+mean(predicted.classes == observed.classes)
+```
+```{r}
+table(predicted.classes, test.data$death)
+```
+
+# Lasso with lambda.lse (AUC = 0.531)
+```{r}
+roc_obj <- roc(test.data$death, predicted.classes)
+auc(roc_obj)
 ```
