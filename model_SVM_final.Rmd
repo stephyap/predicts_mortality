@@ -1,0 +1,268 @@
+---
+title: "SVM"
+author: "Yun Qing"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(install.load)
+install_load("knitr")
+
+install_load("glmnet")
+install_load("skimr")
+install_load('e1071')
+install_load('pROC')
+
+```
+
+## Subject
+Based on the train_final.RData on 4/9/2021, we performed the following model fitting using SVM.
+
+## Results
+```{r, results=F}
+#setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+# getwd()
+load("train_final.RData")
+
+```
+
+a.	Data preparation
+We split the data into training and validation sets.
+```{r}
+dropvar = names(train_final) %in% c('los','patient_num')
+train_final = train_final[!dropvar]
+
+train_final$death = as.factor(train_final$death)
+
+
+set.seed(3)
+n=nrow(train_final)
+train.index=sample(1:n, n*0.75)
+train=train_final[train.index,]
+validation=train_final[-train.index,]
+
+
+```
+
+b. Fit a support vector classifier to the data with various values of cost and select the best one.
+Note that CV is used for building the model for the training data. 
+
+```{r}
+# linear
+# single
+
+svm.linear <- svm(death ~ ., data = train_final, kernel = "linear", cost = 1)
+
+
+pred <- predict(svm.linear, train, decision.values = TRUE)
+#head(pred)
+pred <- as.numeric(as.character(pred))
+
+
+confusion <- table(pred, train$death)
+confusion
+
+accuracy <- (confusion[1,1] + confusion[2,2])/sum(confusion)
+
+
+       
+roc_obj <- roc(train$death, pred)
+train_auc = auc(roc_obj)
+
+val.pred <- predict(svm.linear, validation, decision.values = TRUE)
+#head(val.pred)
+val.pred <- as.numeric(as.character(val.pred))
+
+
+val.confusion <- table(val.pred, validation$death)
+val.confusion
+val.accuracy <- (val.confusion[1,1] + val.confusion[2,2])/sum(val.confusion)
+
+
+val.roc_obj <- roc(validation$death, val.pred)
+val.auc = auc(val.roc_obj)
+
+tr = c(accuracy,train_auc)
+val = c(val.accuracy,val.auc)
+
+cb = as.data.frame(rbind(tr,val))
+colnames(cb) = c("Accuracy","AUC")
+rownames(cb) = c("Training","Validation")
+
+kable(cb,caption = "SVM linear kernel",digits = 3)  
+
+```
+
+
+```{r, eval=F}
+# tune
+set.seed(12)
+linear.out <- tune(svm, death ~ ., data = train, kernel = "linear", ranges = list(cost = c(0.1, 1, 5)))
+summary(linear.out)
+save(linear.out,file = "SVM_linear.Rdata")
+
+
+set.seed(12)
+linear.out2 <- tune(svm, death ~ ., data = train, kernel = "linear", ranges = list(cost = c(0.001,0.01, 0.1, 10, 100, 1000)))
+save(linear.out2,file = "SVM_linear2.Rdata")
+
+summary(linear.out2)
+
+
+```
+
+
+
+
+```{r}
+# polynomial
+# single
+
+# 10 fold CV error from on the training data: 0.1988454
+
+
+svm.poly <- svm(death ~ ., data = train, kernel = "polynomial", cost = 1, degree = 2)
+#svm.poly
+
+pred <- predict(svm.poly, train, decision.values = TRUE)
+pred <- as.numeric(as.character(pred))
+
+
+confusion <- table(pred, train$death)
+confusion
+
+accuracy <- (confusion[1,1] + confusion[2,2])/sum(confusion)
+
+
+       
+roc_obj <- roc(train$death, pred)
+train_auc = auc(roc_obj)
+
+val.pred <- predict(svm.poly, validation, decision.values = TRUE)
+#head(val.pred)
+val.pred <- as.numeric(as.character(val.pred))
+
+
+val.confusion <- table(val.pred, validation$death)
+val.confusion
+val.accuracy <- (val.confusion[1,1] + val.confusion[2,2])/sum(val.confusion)
+
+
+       
+val.roc_obj <- roc(validation$death, val.pred)
+val.auc = auc(val.roc_obj)
+
+tr = c(accuracy,train_auc)
+val = c(val.accuracy,val.auc)
+
+cb = as.data.frame(rbind(tr,val))
+colnames(cb) = c("Accuracy","AUC")
+rownames(cb) = c("Training","Validation")
+
+
+
+kable(cb,caption = "SVM polynomial kernel",digits = 3)          
+
+
+```
+
+
+
+```{r, eval=F}
+# tune
+set.seed(12)
+poly.tune.out <- tune(svm, death ~ ., data = train,  kernel = "polynomial", ranges = list(cost = c(0.01, 0.1, 1, 5, 10, 100), degree = c(2, 3, 4)))
+summary(poly.tune.out)
+
+save(poly.tune.out,file = "SVM_polynomial.Rdata")
+```
+
+
+```{r}
+
+# radial:
+# single
+
+# 10 fold CV error from on the training data: 0.1894415
+
+svm.radial <- svm(death ~ ., data = train,kernel = "radial", cost = 10, gamma = 0.001)
+#svm.radial
+
+pred <- predict(svm.radial, train, decision.values = TRUE)
+#head(pred)
+pred <- as.numeric(as.character(pred))
+
+
+confusion <- table(pred, train$death)
+confusion
+
+accuracy <- (confusion[1,1] + confusion[2,2])/sum(confusion)
+
+
+       
+roc_obj <- roc(train$death, pred)
+train_auc = auc(roc_obj)
+
+val.pred <- predict(svm.radial, validation, decision.values = TRUE)
+#head(val.pred)
+val.pred <- as.numeric(as.character(val.pred))
+
+
+val.confusion <- table(val.pred, validation$death)
+val.confusion
+val.accuracy <- (val.confusion[1,1] + val.confusion[2,2])/sum(val.confusion)
+
+
+       
+val.roc_obj <- roc(validation$death, val.pred)
+val.auc = auc(val.roc_obj)
+
+tr = c(accuracy,train_auc)
+val = c(val.accuracy,val.auc)
+
+cb = as.data.frame(rbind(tr,val))
+colnames(cb) = c("Accuracy","AUC")
+rownames(cb) = c("Training","Validation")
+
+kable(cb,caption = "SVM radial kernel",digits = 3)
+
+
+```
+
+```{r eval=F}
+# tune
+set.seed(12)
+
+radial.tune.out <- tune(svm, death ~ ., data = train, kernel = "radial", ranges = list(cost = c(0.01, 0.1, 1, 5, 10, 100), gamma = c(0.01, 0.1, 1, 5, 10, 100)))
+summary(radial.tune.out)
+save(radial.tune.out,file = "SVM_radial.Rdata")
+
+# 10 fold CV error from on the training data: 0.1952782
+# cost = 1 gamma = 0.01
+
+# 2nd round
+radial.tune.out2 <- tune(svm, death ~ ., data = train, kernel = "radial", ranges = list(cost = c(0.01, 0.1, 1, 5, 10, 100), gamma = c(0.0001,0.001, 0.01)))
+summary(radial.tune.out2)
+save(radial.tune.out2,file = "SVM_radial2.Rdata")
+
+# 3rd round
+radial.tune.out3 <- tune(svm, death ~ ., data = train, kernel = "radial", ranges = list(cost = c( 10,100,500,1000), gamma = c(0.000001,0.00001,0.0001,0.001)))
+summary(radial.tune.out3)
+save(radial.tune.out3,file = "SVM_radial3.Rdata")
+
+```
+
+
+
+
+
+
+
