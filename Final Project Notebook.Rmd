@@ -38,6 +38,7 @@ library(AUC)
 library(pROC)
 library(lda)
 library(superml)
+library(SuperLearner)
 ```
 
 ```{r message=FALSE}
@@ -943,7 +944,7 @@ lasso.model <- glmnet(x, y, alpha = 1, family = "binomial",
                       lambda = cv.lasso$lambda.min)
 # Make prediction on test data
 x.test <- model.matrix(death ~., test.data)[,-1]
-probabilities <- lasso.model %>% predict(newx = x.test)
+probabilities <- lasso.model %>% predict(newx = x.test, type="response")
 predicted.classes <- ifelse(probabilities > 0.5, 1, 0)
 # Model accuracy
 observed.classes <- test.data$death
@@ -966,7 +967,7 @@ lasso.model <- glmnet(x, y, alpha = 1, family = "binomial",
                       lambda = cv.lasso$lambda.1se)
 # Make prediction on test data
 x.test <- model.matrix(death ~., test.data)[,-1]
-probabilities <- lasso.model %>% predict(newx = x.test)
+probabilities <- lasso.model %>% predict(newx = x.test, type="response")
 predicted.classes <- ifelse(probabilities > 0.5, 1, 0)
 # Model accuracy rate
 observed.classes <- test.data$death
@@ -980,6 +981,30 @@ table(predicted.classes, test.data$death)
 ```{r}
 roc_obj <- roc(test.data$death, predicted.classes)
 auc(roc_obj)
+```
+
+9. Super Learner
+#Individual model for glm
+```{r}
+set.seed(1)
+sl = SuperLearner(X=train.reduced$death, Y=train.reduced, family = binomial(), SL.library = "SL.glm")
+```
+#Individual model for gbm
+```{r}
+set.seed(1)
+sl = SuperLearner(X=train$death, Y=train, SL.library = "SL.gbm")
+```
+#Multiple model fit
+```{r}
+set.seed(1)
+sl = SuperLearner(X=train$death, Y=train, family = binomial(),
+                  SL.library =c("SL.gbm","SL.glm"))
+```
+
+
+```{r}
+# onlySL: only fit models that had weight != 0.
+pred=predict(sl, validation, onlySL = TRUE)
 ```
 
 
