@@ -583,14 +583,16 @@ auc(roc_obj)
 
 #### 3. Gradient Boosting
 
-#grid search cv (Runtime of this block 1-2 hours)
 ```{r}
 #make dummy vars from categorical vars
 train.dummy = dummyVars("~.",data=train)
 train.onehot = data.frame(predict(train.dummy,newdata=train))
 validation.dummy = dummyVars("~.",data=validation)
 validation.onehot = data.frame(predict(validation.dummy,newdata=validation))
+```
 
+#grid search cv (Runtime of this block 1-2 hours)
+```{r}
 xgb <- XGBTrainer$new(objective = "binary:logistic", eval_metric = 'auc')
 
 gst <-GridSearchCV$new(trainer = xgb,
@@ -726,7 +728,8 @@ rf.top.features = importance(rf.p2)
 #varImpPlot(rf.p2)
 
 ### Compute AUC and plot ROC-AUC curve ###
-auc(roc(rf.p2$test$votes[,2],y.val)) #get AUC score
+pROC::auc(roc(y.val,rf.p2$test$votes[,2]))
+#auc(roc(rf.p2$test$votes[,2],y.val)) #get AUC score
 #plot(roc(rf.p2$test$votes[,2],y.test)) #plot ROC-AUC curve
 ```
 
@@ -769,13 +772,15 @@ rf.top.features.reduced = importance(rf.reduced)
 #varImpPlot(rf.p2)
 
 ### Compute AUC ###
-auc(roc(rf.p2$test$votes[,2],y.val)) #get AUC score
+#auc(roc(rf.p2$test$votes[,2],y.val)) #get AUC score
+pROC::auc(roc(y.val,rf.p2$test$votes[,2]))
+
 ```
 
 SMOTE for unbalanced classes - oversampling to balance classes
 ```{r}
 #SMOTE to balance classes - training set only
-train.balanced = SMOTE(X=train.onehot[,-8],target=train.onehot[,8])
+train.balanced = SMOTE(X=train.onehot[,-9],target=train.onehot[,9], dup_size = 2)
 train.balanced = train.balanced$data
 train.balanced = train.balanced %>% rename(death = class)
 table(train.balanced$death)
@@ -783,25 +788,6 @@ table(train$death)
 ```
 
 Rerun xgb on balanced data
-
-    logistic regression on balanced data
-    accuracy = 76.3%
-    positive class recall increased from 38% to 66% by using class balanced rather than raw data
-    
-```{r}
-train.balanced$death = as.numeric(train.balanced$death)
-
-#fit model on training data
-glm.fit=glm(death~., data=train.balanced, family=binomial)
-
-#get predictions on validation set
-glm.probs=predict(glm.fit, newdata=validation.onehot, type="response") 
-glm.pred=ifelse(glm.probs>0.5, 1, 0)
-val.accuracy = mean(glm.pred==validation.onehot$death)
-val.accuracy
-#confusion matrix
-table(glm.pred, validation.onehot$death)
-```
 
 gradient boost
 
@@ -825,59 +811,10 @@ val.accuracy
 #confusion matrix
 table(val.pred, validation.onehot$death)
 #auc
-auc(roc(val.probs,labels))
-```
-
-random forest on balanced data
-
-    feature importance
-    
-```{r}
-#set values for mtry (number of predictors sampled for spliting at each node)
-p = dim(train)[2]-1 #p=13
-p2 = p/2
-p_sqrt = sqrt(p)
-
-
-# create x and y training and test sets
-x.train = train.balanced[,-244]
-y.train = as.factor(train.balanced$death)
-x.val = validation.onehot[,-244]
-y.val = as.factor(validation.onehot$death)
-
-#fit random forest for each value of mtry
-rf.p=randomForest(x.train, y.train, xtest = x.val, ytest = y.val, mtry = p, ntree = 100)
-rf.p2=randomForest(x.train, y.train, xtest = x.val, ytest = y.val, mtry = p2, ntree = 100)
-rf.p_sqrt=randomForest(x.train, y.train, xtest = x.val, ytest = y.val, mtry = p_sqrt, ntree = 100)
-
-#plot test error for each model
-plot(1:100, rf.p$test$err.rate[,1], col = "red", type = "l", xlab = "Number of Trees", ylab = "Test Error Rate", ylim = c(.15, .30))
-lines(1:100, rf.p2$test$err.rate[,1], col = "blue", type = "l")
-lines(1:100, rf.p_sqrt$test$err.rate[,1], col = "green", type = "l")
-legend("topright", c("m=p", "m=p/2", "m=sqrt(p)"), col = c("red", "blue", "green"), cex = 1, lty = 1)
-
-# Evaluate model accuracy
-#rf.p2$test$err.rate #Shows error % at each of 500 trees 
-rf.p2$test$confusion # Confusion matrix
-#rf.p2$test$votes #Gives predicted probability for each sample in test set
-#rf.p2$test$votes[,2] #Gives predicted probability for y=1
-
-#get feature importance 
-#importance(rf.p2)
-#varImpPlot(rf.p2)
-
-### Compute AUC and plot ROC-AUC curve ###
-auc(roc(rf.p2$test$votes[,2],y.val)) #get AUC score
-#plot(roc(rf.p2$test$votes[,2],y.test)) #plot ROC-AUC curve
-```
-
-compute AUC and plot ROC-AUC curve
-```{r}
 labels=factor(validation$death)
-auc(roc(val.probs,labels))
-plot(roc(val.probs,labels))
-#### >>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
+pROC::auc(roc(labels,val.probs))
 ```
+
 
 .Tree
 ```{r}
@@ -1298,6 +1235,7 @@ save(radial.tune.out3,file = "SVM_radial3.Rdata")
 
 ### Get final test set predictions
 ```{r}
+#fit GBM model on full training set with optimized parameters
 boost.test = gbm(death~.,data=train_final[,c('death',boost.top.features[1:70])],distribution='bernoulli',n.trees=1000,shrinkage=0.01, interaction.depth=4, class.stratify.cv = 5)
 
 #get predicted probabilities
@@ -1314,11 +1252,8 @@ table(train.pred, train_final$death)
 labels=factor(train_final$death)
 pROC::auc(roc(labels,train.probs))
 
-
-
 #make predictions on test set using full boost model
 test.probs = predict(boost.test, test_df[,c(-1)], n.trees = 1000, type='response')
-#make preds on test set using reduced boost model with n=70
 #make final df with patient id and prediction
 final_preds = data.frame(patient_id = test_df[,c(1)], pred = test.probs)
 #write to csv
