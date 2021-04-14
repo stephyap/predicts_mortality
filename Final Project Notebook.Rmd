@@ -1013,6 +1013,8 @@ auc
 a.	Data preparation
 We split the data into training and validation sets.
 ```{r}
+load("train_final.RData")
+
 dropvar = names(train_final) %in% c('los','patient_num')
 train_final = train_final[!dropvar]
 
@@ -1035,26 +1037,39 @@ Note that CV is used for building the model for the training data.
 # linear
 # single
 
-svm.linear <- svm(death ~ ., data = train_final, kernel = "linear", cost = 1)
+svm.linear <- svm(death ~ ., data = train_final, kernel = "linear", cost = 1,decision.values=T, probability =T)
 
 
 pred <- predict(svm.linear, train, decision.values = TRUE)
 #head(pred)
-pred <- as.numeric(as.character(pred))
 
+pred_roc <- attributes(pred)$decision.values
+#pred_roc <- attributes(pred)$probabilities
+#head(pred_roc)
+
+pred <- as.numeric(as.character(pred))
 
 confusion <- table(pred, train$death)
 confusion
 
 accuracy <- (confusion[1,1] + confusion[2,2])/sum(confusion)
 
+install_load('ROCR')
 
-       
-roc_obj <- roc(train$death, pred)
-train_auc = auc(roc_obj)
+rocplot=function(pred, truth, ...){
+ predob = prediction(pred, truth, c(1,0))
+ perf = performance(predob, "tpr", "fpr")
+ auc = performance(predob, 'auc')
+ 
+   plot(perf,...)
+   return(attributes(auc)$y.values[[1]])}
+
+train_auc = rocplot(pred_roc ,train$death, main=" Training Data")
+train_auc
 
 val.pred <- predict(svm.linear, validation, decision.values = TRUE)
 #head(val.pred)
+val.pred_roc = attributes(val.pred)$decision.values
 val.pred <- as.numeric(as.character(val.pred))
 
 
@@ -1062,9 +1077,9 @@ val.confusion <- table(val.pred, validation$death)
 val.confusion
 val.accuracy <- (val.confusion[1,1] + val.confusion[2,2])/sum(val.confusion)
 
+val.auc = rocplot(val.pred_roc ,validation$death, main="Validation Data")
+val.auc
 
-val.roc_obj <- roc(validation$death, val.pred)
-val.auc = auc(val.roc_obj)
 
 tr = c(accuracy,train_auc)
 val = c(val.accuracy,val.auc)
@@ -1075,7 +1090,16 @@ rownames(cb) = c("Training","Validation")
 
 kable(cb,caption = "SVM linear kernel",digits = 3)  
 
+
+TPR = val.confusion[2,2]/(val.confusion[1,2]+val.confusion[2,2])
+TPR
+TNR = val.confusion[1,1]/(val.confusion[1,1]+val.confusion[2,1])
+TNR
+
 ```
+
+
+
 
 
 ```{r, eval=F}
@@ -1096,6 +1120,8 @@ summary(linear.out2)
 ```
 
 
+
+
 ```{r}
 # polynomial
 # single
@@ -1107,21 +1133,35 @@ svm.poly <- svm(death ~ ., data = train, kernel = "polynomial", cost = 1, degree
 #svm.poly
 
 pred <- predict(svm.poly, train, decision.values = TRUE)
-pred <- as.numeric(as.character(pred))
+#head(pred)
 
+pred_roc <- attributes(pred)$decision.values
+#pred_roc <- attributes(pred)$probabilities
+#head(pred_roc)
+
+pred <- as.numeric(as.character(pred))
 
 confusion <- table(pred, train$death)
 confusion
 
 accuracy <- (confusion[1,1] + confusion[2,2])/sum(confusion)
 
+install_load('ROCR')
 
-       
-roc_obj <- roc(train$death, pred)
-train_auc = auc(roc_obj)
+rocplot=function(pred, truth, ...){
+ predob = prediction(pred, truth, c(1,0))
+ perf = performance(predob, "tpr", "fpr")
+ auc = performance(predob, 'auc')
+ 
+   plot(perf,...)
+   return(attributes(auc)$y.values[[1]])}
+
+train_auc = rocplot(pred_roc ,train$death, main=" Training Data")
+train_auc
 
 val.pred <- predict(svm.poly, validation, decision.values = TRUE)
 #head(val.pred)
+val.pred_roc = attributes(val.pred)$decision.values
 val.pred <- as.numeric(as.character(val.pred))
 
 
@@ -1129,10 +1169,9 @@ val.confusion <- table(val.pred, validation$death)
 val.confusion
 val.accuracy <- (val.confusion[1,1] + val.confusion[2,2])/sum(val.confusion)
 
+val.auc = rocplot(val.pred_roc ,validation$death, main="Validation Data")
+val.auc
 
-       
-val.roc_obj <- roc(validation$death, val.pred)
-val.auc = auc(val.roc_obj)
 
 tr = c(accuracy,train_auc)
 val = c(val.accuracy,val.auc)
@@ -1141,12 +1180,16 @@ cb = as.data.frame(rbind(tr,val))
 colnames(cb) = c("Accuracy","AUC")
 rownames(cb) = c("Training","Validation")
 
+kable(cb,caption = "SVM polynomial kernel",digits = 3)  
 
 
-kable(cb,caption = "SVM polynomial kernel",digits = 3)          
-
+TPR = val.confusion[2,2]/(val.confusion[1,2]+val.confusion[2,2])
+TPR
+TNR = val.confusion[1,1]/(val.confusion[1,1]+val.confusion[2,1])
+TNR
 
 ```
+
 
 
 ```{r, eval=F}
@@ -1171,21 +1214,34 @@ svm.radial <- svm(death ~ ., data = train,kernel = "radial", cost = 10, gamma = 
 
 pred <- predict(svm.radial, train, decision.values = TRUE)
 #head(pred)
-pred <- as.numeric(as.character(pred))
 
+pred_roc <- attributes(pred)$decision.values
+#pred_roc <- attributes(pred)$probabilities
+#head(pred_roc)
+
+pred <- as.numeric(as.character(pred))
 
 confusion <- table(pred, train$death)
 confusion
 
 accuracy <- (confusion[1,1] + confusion[2,2])/sum(confusion)
 
+install_load('ROCR')
 
-       
-roc_obj <- roc(train$death, pred)
-train_auc = auc(roc_obj)
+rocplot=function(pred, truth, ...){
+ predob = prediction(pred, truth, c(1,0))
+ perf = performance(predob, "tpr", "fpr")
+ auc = performance(predob, 'auc')
+ 
+   plot(perf,...)
+   return(attributes(auc)$y.values[[1]])}
+
+train_auc = rocplot(pred_roc ,train$death, main=" Training Data")
+train_auc
 
 val.pred <- predict(svm.radial, validation, decision.values = TRUE)
 #head(val.pred)
+val.pred_roc = attributes(val.pred)$decision.values
 val.pred <- as.numeric(as.character(val.pred))
 
 
@@ -1193,10 +1249,9 @@ val.confusion <- table(val.pred, validation$death)
 val.confusion
 val.accuracy <- (val.confusion[1,1] + val.confusion[2,2])/sum(val.confusion)
 
+val.auc = rocplot(val.pred_roc ,validation$death, main="Validation Data")
+val.auc
 
-       
-val.roc_obj <- roc(validation$death, val.pred)
-val.auc = auc(val.roc_obj)
 
 tr = c(accuracy,train_auc)
 val = c(val.accuracy,val.auc)
@@ -1205,7 +1260,13 @@ cb = as.data.frame(rbind(tr,val))
 colnames(cb) = c("Accuracy","AUC")
 rownames(cb) = c("Training","Validation")
 
-kable(cb,caption = "SVM radial kernel",digits = 3)
+kable(cb,caption = "SVM radial kernel",digits = 3)  
+
+
+TPR = val.confusion[2,2]/(val.confusion[1,2]+val.confusion[2,2])
+TPR
+TNR = val.confusion[1,1]/(val.confusion[1,1]+val.confusion[2,1])
+TNR
 
 
 ```
