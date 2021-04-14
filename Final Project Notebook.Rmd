@@ -516,10 +516,8 @@ summary(glm.fit)
 ```
 
 
-2. Logistic Regression (with Reduced variables - names in "var.sig.RDate")
+#### 2. Logistic Regression (with Reduced variables - names in "var.sig.RDate")
 
-#renaming some column names
-# get names from var.sig in a list : dput(as.character(var.sig$names))
 ```{r}
 #renaming some column names
 # get names from var.sig in a list : dput(as.character(var.sig$names))
@@ -577,18 +575,14 @@ roc_obj <- roc(validation.reduced$death, glm.pred)
 auc(roc_obj)
 ```
 
-<<<<<<< HEAD
-#### Begin BB modeling section #####
-=======
-3. Gradient Boosting
-# first run with n.trees=1000 and shrinkage=0.01, accuracy = 0.806
-# however, 80% of actual outcomes are 0, so this is not a skillful model
-# likely need to balance the classes between train and test sets to get better results
->>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
+#### 3. Gradient Boosting
 
-#### Gradient boost
+    first run with n.trees=1000 and shrinkage=0.01, accuracy = 0.806
+    however, 80% of actual outcomes are 0, so this is not a skillful model
+    likely need to balance the classes between train and test sets to get better results
+    >>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
 
-### grid search cv (Runtime of this block 1-2 hours)
+grid search cv (Runtime of this block 1-2 hours)
 ```{r}
 #make dummy vars from categorical vars
 train.dummy = dummyVars("~.",data=train)
@@ -610,7 +604,7 @@ gst$fit(train.onehot, "death")
 gst$best_iteration()
 ```
 
-# XGBoost model run on all features using optimized hyperparameters from grid search cv
+XGBoost model run on all features using optimized hyperparameters from grid search cv
 ```{r}
 #fit model
 boost = gbm(death~.,data=train,distribution='bernoulli',n.trees=1000,shrinkage=0.01, interaction.depth=4,
@@ -631,12 +625,13 @@ table(val.pred, validation$death)
 #auc
 auc(roc(val.probs,labels))
 ```
-#XGboost full model feature importance
+
+XGboost full model feature importance
 ```{r}
 summary(boost)
 ```
 
-#XGBoost backward feature selection
+XGBoost backward feature selection
 ```{r}
 #get list of top features from model summary
 boost.top.features = summary(boost)[,1:2]
@@ -655,7 +650,7 @@ for(i in 1:length(n.features)){
 plot(n.features,boost.auc,type="b", xlim=rev(range(n.features)))
 ```
 
-#fit Boost final model with optimized n.features (n=70)
+fit Boost final model with optimized n.features (n=70)
 ```{r}
 #fit model
 boost.final = gbm(death~.,data=train[,c('death',boost.top.features[1:70])],distribution='bernoulli',n.trees=1000,shrinkage=0.01, interaction.depth=4,
@@ -679,15 +674,15 @@ auc(roc(val.probs,labels))
 plot(roc(val.probs,labels))
 ```
 
-#Boost final model feature importance
+Boost final model feature importance
 ```{r}
 summary(boost.final)
 ```
 
 
-### Random Forest
+#### 4. Random Forest
 
-#### Fit random forest using grid search cv to find optimized hyperparameters
+Fit random forest using grid search cv to find optimized hyperparameters
 ```{r}
 rf <- RFTrainer$new(classification=1,verbose=FALSE)
 
@@ -701,7 +696,7 @@ gsrf$fit(X=train.onehot, y="death")
 gsrf$best_iteration()
 ```
 
-# Fit full random forest model using optimized hyperparameters
+Fit full random forest model using optimized hyperparameters
 ```{r}
 # create x and y training and test sets
 x.train = train[,-4]
@@ -729,7 +724,8 @@ rf.top.features = importance(rf.p2)
 auc(roc(rf.p2$test$votes[,2],y.val)) #get AUC score
 #plot(roc(rf.p2$test$votes[,2],y.test)) #plot ROC-AUC curve
 ```
-#RF backward feature selection
+
+RF backward feature selection
 ```{r}
 #get list of top features from model summary
 rf.top.features = importance(rf.p2)
@@ -749,7 +745,8 @@ for(i in 1:length(n.features)){
 #plot AUC vs. n.features
 plot(n.features,rf.auc,type="b", xlim=rev(range(n.features)))
 ```
-# Fit reduced random forest model with optimized n.features=110
+
+Fit reduced random forest model with optimized n.features=110
 ```{r}
 #fit random forest
 rf.reduced=randomForest(x.train[,c(rf.top.features[,1][1:110])], y.train, 
@@ -769,8 +766,8 @@ rf.top.features.reduced = importance(rf.reduced)
 ### Compute AUC ###
 auc(roc(rf.p2$test$votes[,2],y.val)) #get AUC score
 ```
-#### SMOTE for unbalanced classes
-# oversampling to balance classes
+
+SMOTE for unbalanced classes - oversampling to balance classes
 ```{r}
 #SMOTE to balance classes - training set only
 train.balanced = SMOTE(X=train.onehot[,-8],target=train.onehot[,8])
@@ -780,10 +777,12 @@ table(train.balanced$death)
 table(train$death)
 ```
 
-# Rerun xgb on balanced data
-# logistic regression on balanced data
-# accuracy = 76.3%
-# positive class recall increased from 38% to 66% by using class balanced rather than raw data
+Rerun xgb on balanced data
+
+    logistic regression on balanced data
+    accuracy = 76.3%
+    positive class recall increased from 38% to 66% by using class balanced rather than raw data
+    
 ```{r}
 train.balanced$death = as.numeric(train.balanced$death)
 
@@ -799,10 +798,12 @@ val.accuracy
 table(glm.pred, validation.onehot$death)
 ```
 
-# gradient boost
-# accuracy = 0.812
-# boosting still predicting very few positive outcomes
-#### >>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
+gradient boost
+
+    accuracy = 0.812
+    boosting still predicting very few positive outcomes
+    >>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
+
 ```{r}
 #fit model
 boost.bal = gbm(death~.,data=train.balanced,distribution='bernoulli',n.trees=1000,shrinkage=0.01, interaction.depth=4, class.stratify.cv = 5)
@@ -823,9 +824,11 @@ table(val.pred, validation.onehot$death)
 auc(roc(val.probs,labels))
 ```
 
-# random forest on balanced data
-# feature importance
-#### >>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
+random forest on balanced data
+
+    feature importance
+    >>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
+    
 ```{r}
 #set values for mtry (number of predictors sampled for spliting at each node)
 p = dim(train)[2]-1 #p=13
@@ -864,7 +867,8 @@ rf.p2$test$confusion # Confusion matrix
 auc(roc(rf.p2$test$votes[,2],y.val)) #get AUC score
 #plot(roc(rf.p2$test$votes[,2],y.test)) #plot ROC-AUC curve
 ```
-# compute AUC and plot ROC-AUC curve
+
+compute AUC and plot ROC-AUC curve
 ```{r}
 labels=factor(validation$death)
 auc(roc(val.probs,labels))
@@ -872,35 +876,7 @@ plot(roc(val.probs,labels))
 #### >>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
 ```
 
-
-4. KNN
-```{r}
-set.seed(3)
-knn_pred=knn(train, validation, train$death, k=1, prob=T, use.all = FALSE)
-table(knn_pred, validation.reduced$death)
-mean(knn_pred == validation.reduced$death)
-```
-
-5. LDA
-```{r}
-lda_model = lda(death~., family=binomial, data=train)
-lda_pred = predict(lda_model, validation, type = "response")
-confusion_matrix = table(lda_pred$class, validation$death)
-print(confusion_matrix)
-mean(lda_pred$class == validation$death)
-```
-
-6. QDA
-```{r}
-qda_model = qda(death~n_med+n_proc, family=binomial, data=train)
-qda_pred = predict(qda_model, validation, type="response")
-# qda_model
-confusion_matrix = table(qda_pred$class, validation$death)
-print(confusion_matrix)
-mean(qda_pred$class == validation$death)
-```
-
-7.Tree
+.Tree
 ```{r}
 #Classification Tree with rpart
 library(rpart)
@@ -916,7 +892,7 @@ plot(fit, uniform=TRUE,
 text(fit, use.n=TRUE, all=TRUE, cex=.8)
 ```
 
-8. Lasso 
+#### 5. Lasso 
 
 ```{r}
 # move death to the last column
@@ -929,14 +905,14 @@ x <- model.matrix(death~., train.data)[,-1]
 y <- (train.data$death)
 ```
 
-# fit the lasso penalized regression model 
+fit the lasso penalized regression model 
 ```{r}
 #fit the lasso penalized regression model
 set.seed(3) 
 cv.lasso <- cv.glmnet(x, y, alpha = 1, family = "binomial")
 ```
 
-# compute the final lasso model using lambda.min (Accuracy: 0.8198198):
+compute the final lasso model using lambda.min (Accuracy: 0.8198198):
 ```{r}
 # compute the final model using lambda.min:
 # Final model with lambda.min
@@ -954,13 +930,13 @@ mean(predicted.classes == observed.classes)
 table(predicted.classes, test.data$death)
 ```
 
-# Lasso with lambda.min (AUC = 0.5729)
+Lasso with lambda.min (AUC = 0.5729)
 ```{r}
 roc_obj <- roc(test.data$death, predicted.classes)
 auc(roc_obj)
 ```
 
-# compute the final model using lambda.lse (Accuracy: 0.8098098):
+compute the final model using lambda.lse (Accuracy: 0.8098098):
 ```{r}
 # Final model with lambda.1se
 lasso.model <- glmnet(x, y, alpha = 1, family = "binomial",
@@ -977,22 +953,21 @@ mean(predicted.classes == observed.classes)
 table(predicted.classes, test.data$death)
 ```
 
-# Lasso with lambda.lse (AUC = 0.531)
+Lasso with lambda.lse (AUC = 0.531)
 ```{r}
 roc_obj <- roc(test.data$death, predicted.classes)
 auc(roc_obj)
 ```
 
-9. Super Learner
-#Individual model for glm
+#### 6. Super Learner
+Individual model for glm
 ```{r}
 set.seed(1)
 sl = SuperLearner(Y=train.reduced$death, X=train.reduced[,-148], family = binomial(), SL.library = "SL.glm")
 sl
 ```
 
-
-#AUC (0.8603 for train, 0.8223 for validation)
+AUC (0.8603 for train, 0.8223 for validation)
 ```{r}
 # onlySL: only fit models that had weight != 0.
 # train auc
@@ -1008,20 +983,18 @@ auc1 = ROCR::performance(pred_rocr1, measure = "auc", x.measure = "cutoff")@y.va
 auc1
 ```
 
-
-#Individual model for gbm
+Individual model for gbm
 ```{r}
 set.seed(1)
 sl = SuperLearner(Y=train$death, X=train, SL.library = "SL.gbm")
 ```
 
-#Multiple model fit
+Multiple model fit
 ```{r}
 set.seed(1)
 sl = SuperLearner(Y=train$death, X=train, family = binomial(),
                   SL.library =c("SL.gbm","SL.glm"))
 ```
-
 
 ```{r}
 pred=predict(sl, validation, onlySL = TRUE)
