@@ -14,7 +14,6 @@ The primary outcome is mortality; defined as in-hospital death or discharge to h
 #### Task 
 Build a machine-learning model to predict mortality in subarachnoid hemorrhage patients. 
 
-
 ###  Importing datasets 
 ```{r message=FALSE}
 ### loading packages
@@ -41,6 +40,7 @@ library(install.load)
 install_load("knitr")
 install_load("skimr")
 install_load('e1071')
+install_load('ROCR')
 ```
 
 ```{r message=FALSE}
@@ -806,7 +806,6 @@ gradient boost
 
     accuracy = 0.812
     boosting still predicting very few positive outcomes
-    >>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
 
 ```{r}
 #fit model
@@ -831,7 +830,6 @@ auc(roc(val.probs,labels))
 random forest on balanced data
 
     feature importance
-    >>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
     
 ```{r}
 #set values for mtry (number of predictors sampled for spliting at each node)
@@ -924,6 +922,43 @@ lasso.model <- glmnet(x, y, alpha = 1, family = "binomial",
                       lambda = cv.lasso$lambda.min)
 # Make prediction on test data
 x.test <- model.matrix(death ~., test.data)[,-1]
+```
+
+
+```{r}
+# determining the best threshold
+auc = double(10)
+labels = validation$death
+pred = predict(lasso.model, newx=x.test, type="response", s=0.01)
+for (i in 1:10){
+  predictions=ifelse(pred>0.1*i, 1,0)
+  predictions
+  predictions1=prediction(predictions,labels)
+  perf=performance(predictions1, "tpr", "fpr")
+  auc.perf=performance(predictions1, measure="auc")
+  auc[i]=auc.perf@y.values
+}
+```
+
+```{r}
+auc[1:10]
+```
+
+```{r}
+thresholds= c(0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0)
+auc=unlist(auc,recursive=TRUE,use.names =TRUE)
+best=which.max(auc)
+best.threshold=thresholds[best]
+```
+
+```{r}
+plot(thresholds,auc[1:10],type="b",ylab="AUC",main="AUC VS Threshold",col="blue")
+points(thresholds[best],auc[best],pch=19,col="red")
+abline(v=c(0.0,0.2,0.4,0.6,0.8,1),lty=2,col="darkgrey")
+abline(h=c(0.5,0.6,0.7,0.8,0.9),lty=2,col="darkgrey")
+```
+
+```{r}
 probabilities <- lasso.model %>% predict(newx = x.test, type="response")
 predicted.classes <- ifelse(probabilities > 0.5, 1, 0)
 # Model accuracy
@@ -948,7 +983,7 @@ lasso.model <- glmnet(x, y, alpha = 1, family = "binomial",
 # Make prediction on test data
 x.test <- model.matrix(death ~., test.data)[,-1]
 probabilities <- lasso.model %>% predict(newx = x.test, type="response")
-predicted.classes <- ifelse(probabilities > 0.5, 1, 0)
+predicted.classes <- ifelse(probabilities > 0.2, 1, 0)
 # Model accuracy rate
 observed.classes <- test.data$death
 mean(predicted.classes == observed.classes)
@@ -1093,8 +1128,6 @@ summary(linear.out2)
 
 
 ```
-
-
 
 
 ```{r}
