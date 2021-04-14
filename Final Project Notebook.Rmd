@@ -987,7 +987,8 @@ auc(roc_obj)
 #Individual model for glm
 ```{r}
 set.seed(1)
-sl = SuperLearner(Y=train$death, X=train[,-4], SL.library = "SL.glm")
+sl = SuperLearner(Y=train.reduced$death, X=train.reduced[,-148], family = binomial(), SL.library = "SL.glm")
+sl
 ```
 
 
@@ -1028,6 +1029,3 @@ pred_rocr = ROCR::prediction(pred$pred, validation.reduced$death)
 auc = ROCR::performance(pred_rocr, measure = "auc", x.measure = "cutoff")@y.values[[1]]
 auc
 ```
-
-
-
