@@ -1,0 +1,173 @@
+---
+title: "Super Learner"
+output: html_notebook
+---
+
+Code adapted from https://cran.r-project.org/web/packages/SuperLearner/vignettes/Guide-to-SuperLearner.html
+
+
+```{r}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(anytime)
+library(randomForest)
+library(gbm)
+library(glmnet)
+library(caret)
+library(AUC)
+library(MASS)
+library(doParallel)
+library(SuperLearner)
+library(xgboost)
+```
+
+### training set with 3000 obs and validation set with 995 obs
+```{r}
+source("data_prep_func.R")
+train_final <- prepData(keep.id = T)
+# dim(train_final)
+set.seed(123)
+train.idx <- sample(nrow(train_final), 3000)
+train <- train_final[train.idx, ]
+validation <- train_final[-train.idx, ]
+```
+
+### create outcome and data matrix for super learner
+```{r}
+y.train <- train$death
+y.valid <- validation$death
+
+x.train <- subset(train, select = forward.res2)
+x.valid <- subset(validation, select = forward.res2)
+```
+
+### Random forest
+
+```{r}
+# sqrt(p) is the default value of mtry for classification.
+# floor(sqrt(ncol(x.train)))
+mtry.grid = floor(sqrt(ncol(x_train)) * c(0.5, 1, 2))
+```
+
+```{r}
+learners = create.Learner("SL.ranger", tune = list(mtry = mtry.grid))
+```
+
+```{r}
+set.seed(1)
+
+# Fit the CV.SuperLearner.
+# We use V = 3 to save computation time; for a real analysis use V = 10 or 20.
+cv.sl.rf = CV.SuperLearner(Y = y.train, X = x.train, family = binomial(),
+                           V = 5,
+                        SL.library = c("SL.mean", "SL.glmnet", learners$names, "SL.ranger"))
+save(cv.sl.rf, file = "cv.sl.rf.RData")
+
+```
+```{r}
+# load("cv.sl.rf.RData")
+# Review results.
+summary(cv.sl.rf)
+```
+```{r}
+plot(cv.sl.rf) + theme_bw()
+```
+
+mtry = 3 for random forest. 
+
+### XGBoost
+```{r}
+tune = list(ntrees = c(100, 500, 1000),
+            max_depth = 1:3,
+            shrinkage = c(0.001, 0.01, 0.1))
+learners = create.Learner("SL.xgboost", tune = tune, detailed_names = TRUE, name_prefix = "xgb")
+```
+
+
+```{r}
+set.seed(1)
+cv.sl.xgb = CV.SuperLearner(Y = y_train, X = x_train, family = binomial(),
+                          V = 5,
+                          SL.library = c("SL.mean", "SL.glmnet", learners$names, "SL.ranger"))
+```
+
+```{r}
+save(cv.sl.xgb, file = "cv.sl.xgb.RData")
+summary(cv.sl.xgb)
+```
+
+```{r fig.height=8, fig.width=6}
+plot(cv.sl.xgb) + theme_bw()
+```
+
+```{r}
+set.seed(1)
+cv.sl.xgb.auc = CV.SuperLearner(Y = y_train, X = x_train, family = binomial(),
+                          V = 5, method = "method.AUC",
+                          SL.library = c("SL.mean", "SL.glmnet", learners$names, "SL.ranger"))
+```
+
+```{r}
+summary(cv.sl.xgb)
+```
+
+
+### Ensembling models
+
+```{r}
+listWrappers()
+```
+
+
+```{r}
+# Create a new function that changes just the ntree argument.
+# (We could do this in a single line.)
+# "..." means "all other arguments that were sent to the function"
+SL.rf.better = function(...) {
+  SL.ranger(..., num.trees = 1000, mtry = 3)
+}
+
+SL.xgb.better = function(...) {
+  SL.xgboost(..., n.trees = 1000, max_depth = 2, shrinkage = 0.01)
+}
+```
+
+```{r}
+cv.sl.all = CV.SuperLearner(Y = y_train, X = x_train, family = binomial(),
+                          V = 5,
+                          SL.library = c("SL.glmnet", "SL.rf.better", 
+                                         "SL.xgb.better"
+                                         ))
+```
+
+```{r}
+plot(cv.sl.all) + theme_bw()
+```
+
+
+
+### predict on validation set
+```{r}
+set.seed(1)
+sl = SuperLearner(Y = y_train, X = x_train, family = binomial(),
+  SL.library = c("SL.glmnet", "SL.rf.better", "SL.xgb.better"))
+```
+
+
+```{r}
+x.valid <- subset(validation, select = forward.res2)
+sl.pred = predict(sl, x.valid, onlySL = TRUE)
+str(sl.pred)
+```
+
+
+```{r fig.height=4, fig.width=4}
+sl.roc <- rocit(score = sl.pred$pred[,1], class = validation$death)
+plot(sl.roc, values = T, YIndex = F, legend = F)
+legend("bottomright", legend = paste0("AUC = ", round(sl.roc$AUC, 3)), 
+       bty = "n")
+```
+
+
+
