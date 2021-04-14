@@ -987,24 +987,46 @@ auc(roc_obj)
 #Individual model for glm
 ```{r}
 set.seed(1)
-sl = SuperLearner(X=train.reduced$death, Y=train.reduced, family = binomial(), SL.library = "SL.glm")
+sl = SuperLearner(Y=train$death, X=train[,-4], SL.library = "SL.glm")
 ```
+
+
+#AUC (0.8603 for train, 0.8223 for validation)
+```{r}
+# onlySL: only fit models that had weight != 0.
+# train auc
+pred=predict(sl, train.reduced[,-148], onlySL = TRUE)
+pred_rocr = ROCR::prediction(pred$pred, train.reduced$death)
+auc = ROCR::performance(pred_rocr, measure = "auc", x.measure = "cutoff")@y.values[[1]]
+auc
+
+# validation auc
+pred1=predict(sl, validation.reduced[,-148], onlySL = TRUE)
+pred_rocr1 = ROCR::prediction(pred1$pred, validation.reduced$death)
+auc1 = ROCR::performance(pred_rocr1, measure = "auc", x.measure = "cutoff")@y.values[[1]]
+auc1
+```
+
+
 #Individual model for gbm
 ```{r}
 set.seed(1)
-sl = SuperLearner(X=train$death, Y=train, SL.library = "SL.gbm")
+sl = SuperLearner(Y=train$death, X=train, SL.library = "SL.gbm")
 ```
+
 #Multiple model fit
 ```{r}
 set.seed(1)
-sl = SuperLearner(X=train$death, Y=train, family = binomial(),
+sl = SuperLearner(Y=train$death, X=train, family = binomial(),
                   SL.library =c("SL.gbm","SL.glm"))
 ```
 
 
 ```{r}
-# onlySL: only fit models that had weight != 0.
 pred=predict(sl, validation, onlySL = TRUE)
+pred_rocr = ROCR::prediction(pred$pred, validation.reduced$death)
+auc = ROCR::performance(pred_rocr, measure = "auc", x.measure = "cutoff")@y.values[[1]]
+auc
 ```
 
 
