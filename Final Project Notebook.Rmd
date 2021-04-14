@@ -1,23 +1,21 @@
 ---
 title: "Final Project Notebook"
 authors: "Brian Bacik, Chiu Feng Yap, Joy Yoo, Yi Yao, Yun Qing"
-date: "3/26/2021"
+date: "4/14/2021"
 output: html_document
 ---
-
 
 ### Introduction of the Project
 The goal of this project is to predict in-hospital ‘death’ of Subarachnoid Hemorrhage (SAH) patients using all patients’ records in the first 3 days from the start time of the hospitalization. No information after the first 3 days should be used as variables. Inputs of prediction includes patients’ encounter data, medications, and procedures.  A test set will be given but the outcome will not be included in the dataset provided to students. 
 
-### Outcome
+#### Outcome
 The primary outcome is mortality; defined as in-hospital death or discharge to hospice care. 
 
-### Task 
+#### Task 
 Build a machine-learning model to predict mortality in subarachnoid hemorrhage patients. 
 
 
-####  Importing datasets 
-
+###  Importing datasets 
 ```{r message=FALSE}
 ### loading packages
 library(dplyr)
@@ -47,8 +45,8 @@ med_train <- read_csv("medication_train.csv")
 proc_train <- read_csv("procedure_train.csv")
 ```
 
+### Data Prepocessing
 #### Factor-to-time conversion
-
 ```{r}
 demo_train <- demo_train %>% 
   mutate(New_admitted_dt_tm = anytime(New_admitted_dt_tm), ## anytime() Parse POSIXct or Date objects from input data
@@ -82,8 +80,6 @@ proc_train <- proc_train %>%
     procedure_date = procedure_dt_tm
   )
 ```
-
-
 
 #### To combine all prediction variables into one dataset, we first:
 
@@ -119,7 +115,7 @@ proc_train <- proc_train[,c(1,3,4,2,5)]
 
 #### Calculating the date intervals in days
 
-- define LOS = discharge_date - admission_date
+    define LOS = discharge_date - admission_date
 
 ```{r}
 demo_train <- demo_train %>% 
@@ -373,7 +369,7 @@ joined_df <- demo_train_new %>%
   left_join(proc.tmp1, by = c('patient_num'))
 ```
 
-### BB - pivot med and proc dfs and merge with joined_df to get individual meds/procedures as features
+#### Pivot med and proc dfs and merge with joined_df to get individual meds/procedures as features
 
 ```{r}
 # filter to only medications with 50 or more patients
@@ -391,7 +387,7 @@ med_train_pivot = med_train %>%
 med_train_pivot_filter = subset(med_train_pivot,select= c('patient_num',med_freq_filter$generic_name))
 ```
 
-#repeat above 4 steps for procedures df
+##### repeat above 4 steps for procedures df
 ```{r}
 proc_freq_filter = filter(proc_freq, n>50) # 59 procs with > 50 patients
 proc_train = subset(proc_train, select=-c(procedure_description,admission_date, procedure_date))
@@ -404,14 +400,14 @@ proc_train_pivot = proc_train %>%
 proc_train_pivot_filter = subset(proc_train_pivot,select= c('patient_num',proc_freq_filter$procedure_id))
 ```
 
-# merge into master df
+##### merge into master df
 ```{r}
 merged_train_df = joined_df %>%
   left_join(med_train_pivot_filter, by = c('patient_num')) %>% 
    left_join(proc_train_pivot_filter, by = c('patient_num'))
 ```
 
-### BB make final train set
+##### make final train set
 
 ```{r}
 #convert NAs to zeros
@@ -421,27 +417,29 @@ merged_train_df[is.na(merged_train_df)] = 0
 train_final = subset(merged_train_df,select= -c(admission_date,discharge_date))
 ```
 
+#### Save final train data into "train_final.RData"
+
 ```{r}
 save(train_final, file = "train_final.RData")
 ```
 
-# load data
+#### load data
 ```{r}
 load("train_final.RData")
 ```
 
-# a quick descriptive
+#### a quick descriptive
 ```{r}
 tb <- createTable(compareGroups(death ~. , data = train_final[, -1]))
 export2word(tb, file = "train_final_descr.doc")
 ```
 
-#convert categorical variables to factors
+##### convert categorical variables to factors
 ```{r}
 train_final$gender = as.factor(train_final$gender)
 ```
 
-#convert response variable to binary
+##### convert response variable to binary
 ```{r}
 train_final$death = as.integer(as.logical(train_final$death))
 ```
@@ -452,7 +450,7 @@ train_final = subset(train_final, select=-c(patient_num, los))
 ```
 
 
-#split training data into training and validation sets
+### split training data into training and validation sets
 ```{r}
 set.seed(3)
 n=nrow(train_final)
@@ -494,9 +492,10 @@ save(var.sig, file = "var.sig.RData")
 
 ### Predictive models
 
-1. Logistic regression (without Dimension reduction)
-# First run accuracy = 81.0%
-# Using binary meds and procs, accurcy is 83.2%
+#### 1. Logistic regression (without Dimension reduction)
+
+    First run accuracy = 81.0%
+    Using binary meds and procs, accurcy is 83.2%
 
 ```{r}
 #fit model on training data
@@ -510,8 +509,9 @@ val.accuracy
 table(glm.pred, validation$death)
 ```
 
-# logistic regression summary
+
 ```{r}
+# logistic regression summary
 summary(glm.fit)
 ```
 
