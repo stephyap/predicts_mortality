@@ -441,6 +441,8 @@ export2word(tb, file = "train_final_descr.doc")
 ##### convert categorical variables to factors
 ```{r}
 train_final$gender = as.factor(train_final$gender)
+train_final$any_vaso = as.factor(train_final$any_vaso)
+
 ```
 
 ##### convert response variable to binary
@@ -581,12 +583,7 @@ auc(roc_obj)
 
 #### 3. Gradient Boosting
 
-    first run with n.trees=1000 and shrinkage=0.01, accuracy = 0.806
-    however, 80% of actual outcomes are 0, so this is not a skillful model
-    likely need to balance the classes between train and test sets to get better results
-    >>>>>>> f2a63f9c9de30a68dd5391391b08f009c6a8ff28
-
-grid search cv (Runtime of this block 1-2 hours)
+#grid search cv (Runtime of this block 1-2 hours)
 ```{r}
 #make dummy vars from categorical vars
 train.dummy = dummyVars("~.",data=train)
@@ -611,8 +608,7 @@ gst$best_iteration()
 XGBoost model run on all features using optimized hyperparameters from grid search cv
 ```{r}
 #fit model
-boost = gbm(death~.,data=train,distribution='bernoulli',n.trees=1000,shrinkage=0.01, interaction.depth=4,
-            class.stratify.cv = 5)
+boost = gbm(death~.,data=train,distribution='bernoulli',n.trees=1000,shrinkage=0.01, interaction.depth=4,class.stratify.cv = 5)
 #get predicted probabilities
 train.probs = predict(boost, train, n.trees = 1000)
 val.probs = predict(boost, validation, n.trees = 1000)
@@ -627,7 +623,8 @@ val.accuracy
 #confusion matrix
 table(val.pred, validation$death)
 #auc
-auc(roc(val.probs,labels))
+labels=factor(validation$death)
+pROC::auc(roc(labels,val.probs))
 ```
 
 XGboost full model feature importance
@@ -648,7 +645,7 @@ boost.auc=rep(0,length(n.features)) #empty array to add results
 for(i in 1:length(n.features)){
   boost.reduced = gbm(death~.,data=train[,c('death',boost.top.features[1:n.features[i]])],distribution='bernoulli',n.trees=1000,shrinkage=0.01, interaction.depth=4, class.stratify.cv = 5)
   val.probs = predict(boost.reduced, validation[,c('death',boost.top.features[1:n.features[i]])], n.trees = 1000)
-  boost.auc[i] = auc(roc(val.probs,labels))
+  boost.auc[i] = pROC::auc(roc(labels,val.probs))
 }
 #plot AUC vs. n.features
 plot(n.features,boost.auc,type="b", xlim=rev(range(n.features)))
@@ -656,6 +653,10 @@ plot(n.features,boost.auc,type="b", xlim=rev(range(n.features)))
 
 fit Boost final model with optimized n.features (n=70)
 ```{r}
+#get list of top features from model summary
+boost.top.features = summary(boost)[,1:2]
+boost.top.features = gsub('`','',boost.top.features[,1])
+
 #fit model
 boost.final = gbm(death~.,data=train[,c('death',boost.top.features[1:70])],distribution='bernoulli',n.trees=1000,shrinkage=0.01, interaction.depth=4,
             class.stratify.cv = 5)
@@ -673,9 +674,9 @@ val.accuracy
 #confusion matrix
 table(val.pred, validation$death)
 #auc
+#plot(roc(val.probs,labels))
 labels=factor(validation$death)
-auc(roc(val.probs,labels))
-plot(roc(val.probs,labels))
+pROC::auc(roc(labels,val.probs))
 ```
 
 Boost final model feature importance
@@ -1232,3 +1233,36 @@ summary(radial.tune.out3)
 save(radial.tune.out3,file = "SVM_radial3.Rdata")
 
 ```
+
+
+### Get final test set predictions
+```{r}
+boost.test = gbm(death~.,data=train_final[,c('death',boost.top.features[1:70])],distribution='bernoulli',n.trees=1000,shrinkage=0.01, interaction.depth=4, class.stratify.cv = 5)
+
+#get predicted probabilities
+train.probs = predict(boost.test, train_final[,c('death',boost.top.features[1:70])], n.trees = 1000, type='response')
+#get binary predictions
+train.pred=ifelse(train.probs>0.5, 1, 0)
+#get accuracy 
+train.accuracy = mean(train.pred==train_final$death)
+train.accuracy
+#confusion matrix
+table(train.pred, train_final$death)
+#auc
+#plot(roc(val.probs,labels))
+labels=factor(train_final$death)
+pROC::auc(roc(labels,train.probs))
+
+
+
+#make predictions on test set using full boost model
+test.probs = predict(boost.test, test_df[,c(-1)], n.trees = 1000, type='response')
+#make preds on test set using reduced boost model with n=70
+#make final df with patient id and prediction
+final_preds = data.frame(patient_id = test_df[,c(1)], pred = test.probs)
+#write to csv
+write.csv(final_preds,'/Users/Brian/Dropbox/UTHealth/PH 1976/predicts_mortality/final_preds2.csv', row.names = FALSE)
+```
+
+
+
