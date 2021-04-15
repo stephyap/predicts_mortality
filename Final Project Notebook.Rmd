@@ -535,125 +535,47 @@ table(glm.pred, validation$death)
 ```
 
 
-#### 2. Logistic Regression (with Reduced variables - names in "var.sig.RDate")
+#### 2. Logistic Regression (with Reduced variables)
 
+    AUC 0.8558926 
+    Accuracy 0.8259041        
+    glm.pred   0   1
+           0 830 145
+           1  62 152
+           
 ```{r}
-#renaming some column names
-# get names from var.sig in a list : dput(as.character(var.sig$names))
-edited_var <- c("P141", "P44", "norepinephrine", "age", "P2549", "ondansetron", 
-"P154650", "nimodipine", "P122879", "P2548", "any_vaso", "piperacillin_tazobactam", 
-"hydralazine", "heparin", "lidocaine", "ocular_lubricant", "dopamine", 
-"fentanyl", "glucose", "n_vaso", "docusate", "labetalol", "etomidate", 
-"mannitol", "min_days_med_adm", "P43", "P4852", "codeine", "hydromorphone", 
-"sodium_bicarbonate", "lvp_solution_with_hypertonic_saline", 
-"cefepime", "P310", "P4631", "P3006", "lorazepam", "acetaminophen_oxycodone", 
-"chlorhexidine_topical", "succinylcholine", "apap_butalbital_caffeine", 
-"P161794", "P161793", "min_days_pro_adm", "P4756", "sterile_water", 
-"albuterol_ipratropium", "ipratropium", "P141780", "protamine", 
-"levofloxacin", "n_proc", "acetaminophen_hydrocodone", "levetiracetam", 
-"vancomycin", "metoclopramide", "potassium_phosphate_sodium_phosphate", 
-"ceftriaxone", "promethazine", "nicardipine", "max_days_med_adm", 
-"P337", "lvp_solution_with_potassium", "lvp_solution", "glucagon", 
-"vecuronium", "oxycodone", "P2232", "glycopyrrolate", "dexamethasone", 
-"calcium_chloride", "P42", "sodium_chloride", "diphenhydramine", 
-"propofol", "ketorolac", "P157534", "magnesium_sulfate", "phytonadione", 
-"acetaminophen", "digoxin", "neostigmine", "verapamil", "P356", 
-"simvastatin", "ranitidine", "P159871", "P284", "albuterol", 
-"methylprednisolone", "pravastatin", "insulin_regular", "midazolam", 
-"meperidine", "sugammadex", "morphine", "clindamycin", "senna", 
-"furosemide", "P5097", "P606", "P2610", "aspirin", "phenytoin", 
-"remifentanil", "papaverine", "insulin_aspart_insulin_aspart_protamine", 
-"P90", "calcium_carbonate", "hydrochlorothiazide", "clonidine", 
-"docusate_senna", "indocyanine_green", "iopamidol", "P155690", 
-"prochlorperazine", "P157536", "acetaminophen_codeine", "nicotine", 
-"n_med", "calcium_gluconate", "P157076", "P620", "race", "sufentanil", 
-"insulin_lispro", "bisacodyl", "iodixanol", "eptifibatide", "losartan", 
-"P159447", "zolpidem", "P158020", "P157074", "lisinopril", "P110148", 
-"esmolol", "dolasetron", "al_hydroxide_mg_hydroxide_simethicone", 
-"gender", "P84", "heparin_flush", "fluticasone_nasal", "amlodipine", 
-"P98597", "cefazolin", "rosuvastatin", "lidocaine_topical")
+reduced <- c("P2548", "P44", "norepinephrine", "age", "P2549", "P122879", 
+"P154650", "P161794", "hydralazine", "fentanyl", "P4852", "mannitol", 
+"propofol", "ocular_lubricant", "nimodipine", "lvp_solution", 
+"P337", "lidocaine", "iopamidol", "lvp_solution_with_hypertonic_saline", 
+"piperacillin_tazobactam", "P284", "P4631", "P157534", "calcium_carbonate", 
+"docusate_senna", "cefazolin", "glucose", "acetaminophen_oxycodone")
 ```
 
-Logistic regression with reduced variable set 1 (var.sig)
-
-    AUC 0.8658
-    Prediction 0.8334735       
-    glm.pred   0   1
-            0 826 132
-            1  66 165
-
-    
 ```{r}
-train.reduced_1 <- train %>% select(edited_var,death)
-validation.reduced_1 <- validation %>% select(edited_var,death)
+train.reduced <- train %>% select(reduced,death)
+validation.reduced <- validation %>% select(reduced,death)
 
-default_glm_mod_1=train(
+default_glm_mod_red=train(
   form=death~.,
-  data=train.reduced_1,
+  data=train.reduced,
   trControl=trainControl(method="cv", number=5),
   method="glm",
   family='binomial'
 )
 
 # AUC 
-glm.probs=predict(default_glm_mod_1, newdata=validation.reduced_1) ## probability
-roc_obj <- roc(validation.reduced_1$death, glm.probs)
+glm.probs=predict(default_glm_mod_red, newdata=validation.reduced) ## probability
+roc_obj <- roc(validation.reduced$death, glm.probs)
 auc = auc(roc_obj)
 cat('AUC', auc, '\n')
 
 # Accuracy 
 glm.pred=ifelse(glm.probs>0.5, 1, 0)
-val.accuracy = mean(validation.reduced_1$death == glm.pred)
+val.accuracy = mean(validation.reduced$death == glm.pred)
 cat('Accuracy', val.accuracy)
 #confusion matrix
-table(glm.pred, validation.reduced_1$death)
-```
-
-##### with reduced variables from forward.res.RData
-```{r}
-red.var <- c("age", "P44", "P141", "P154650", "norepinephrine", "P2549", 
-"P2548", "P161794", "P161793", "P4852", "P43", "ocular_lubricant", 
-"mannitol", "propofol", "cefepime", "P157534", "lvp_solution", 
-"n_med", "piperacillin_tazobactam", "P310", "P337", "codeine", 
-"P620", "lvp_solution_with_hypertonic_saline", "sodium_bicarbonate", 
-"iopamidol", "apap_butalbital_caffeine", "calcium_carbonate", 
-"P4631", "P284", "sterile_water", "P157076", "iodixanol", "glucose", 
-"glucagon")
-```
-
-    Accuracy: 0.84020
-            
-    glm.pred   0   1
-           0 836 143
-           1  56 163
-    Setting levels: control = 0, case = 1
-    Setting direction: controls < cases
-    Area under the curve: 0.8747
-    
-```{r}
-train.reduced_2 <- train %>% select(red.var,death)
-validation.reduced_2 <- validation %>% select(red.var,death)
-
-default_glm_mod_2=train(
-  form=death~.,
-  data=train.reduced_2,
-  trControl=trainControl(method="cv", number=5),
-  method="glm",
-  family='binomial'
-)
-
-# AUC 
-glm.probs=predict(default_glm_mod_2, newdata=validation.reduced_2) ## probability
-roc_obj <- roc(validation.reduced_2$death, glm.probs)
-auc = auc(roc_obj)
-cat('AUC', auc, '\n')
-
-# Accuracy 
-glm.pred=ifelse(glm.probs>0.5, 1, 0)
-val.accuracy = mean(validation.reduced_2$death == glm.pred)
-cat('Accuracy', val.accuracy)
-#confusion matrix
-table(glm.pred, validation.reduced_2$death)
+table(glm.pred, validation.reduced$death)
 ```
 
 #### 3. Gradient Boosting
