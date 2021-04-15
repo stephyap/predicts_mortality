@@ -443,7 +443,6 @@ export2word(tb, file = "train_final_descr.doc")
 ```{r}
 train_final$gender = as.factor(train_final$gender)
 train_final$any_vaso = as.factor(train_final$any_vaso)
-
 ```
 
 ##### convert response variable to binary
@@ -839,7 +838,7 @@ pROC::auc(roc(y.val,rf.p2$test$votes[,2]))
 SMOTE for unbalanced classes - oversampling to balance classes
 ```{r}
 #SMOTE to balance classes - training set only
-train.balanced = SMOTE(X=train.onehot[,-9],target=train.onehot[,9], dup_size = 2)
+train.balanced = smotefamily::SMOTE(X=train.onehot[,-7],target=train.onehot[,7], dup_size = 2)
 train.balanced = train.balanced$data
 train.balanced = train.balanced %>% rename(death = class)
 table(train.balanced$death)
@@ -1296,25 +1295,22 @@ save(radial.tune.out3,file = "SVM_radial3.Rdata")
 ```{r}
 #fit GBM model on full training set with optimized parameters
 boost.test = gbm(death~.,data=train_final[,c('death',boost.top.features[1:70])],distribution='bernoulli',n.trees=1000,shrinkage=0.01, interaction.depth=4, class.stratify.cv = 5)
-
 #get predicted probabilities
-train.probs = predict(boost.test, train_final[,c('death',boost.top.features[1:70])], n.trees = 1000, type='response')
+boost.probs = predict(boost.test, train_final[,c('death',boost.top.features[1:70])], n.trees = 1000, type='response')
 #get binary predictions
-train.pred=ifelse(train.probs>0.5, 1, 0)
+boost.pred=ifelse(boost.probs>0.5, 1, 0)
 #get accuracy 
-train.accuracy = mean(train.pred==train_final$death)
-train.accuracy
+boost.accuracy = mean(boost.pred==train_final$death)
+boost.accuracy
 #confusion matrix
-table(train.pred, train_final$death)
+table(boost.pred, train_final$death)
 #auc
-#plot(roc(val.probs,labels))
-labels=factor(train_final$death)
-pROC::auc(roc(labels,train.probs))
-
+pROC::auc(roc(labels,boost.probs))
 #make predictions on test set using full boost model
-test.probs = predict(boost.test, test_df[,c(-1)], n.trees = 1000, type='response')
+boost.test.probs = predict(boost.test, test_df[,c(-1)], n.trees = 1000, type='response')
+
 #make final df with patient id and prediction
-final_preds = data.frame(patient_id = test_df[,c(1)], pred = test.probs)
+final_preds = data.frame(patient_id = test_df[,c(1)], boost.pred = boost.test.probs)
 #write to csv
 write.csv(final_preds,'/Users/Brian/Dropbox/UTHealth/PH 1976/predicts_mortality/final_preds2.csv', row.names = FALSE)
 ```
