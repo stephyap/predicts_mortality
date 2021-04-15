@@ -528,7 +528,7 @@ cat('Prediction', val.accuracy)
 #confusion matrix
 table(glm.pred, validation$death)
 # logistic regression summary
-summary(glm.fit)
+# summary(glm.fit)
 ```
 
 
@@ -600,7 +600,7 @@ roc_obj <- roc(validation.reduced$death, glm.probs)
 auc(roc_obj)
 ```
 
-##### with reduced variables set 2 from forward.res.RData
+##### with reduced variables from forward.res.RData
 ```{r}
 red.var <- c("age", "P44", "P141", "P154650", "norepinephrine", "P2549", 
 "P2548", "P161794", "P161793", "P4852", "P43", "ocular_lubricant", 
@@ -908,10 +908,10 @@ fit the lasso penalized regression model
 ```{r}
 #fit the lasso penalized regression model
 set.seed(3) 
-cv.lasso <- cv.glmnet(x, y, alpha = 1, family = "binomial")
+cv.lasso <- cv.glmnet(x, y, alpha = 1, family = "binomial", nfolds=5)
 ```
 
-compute the final lasso model using lambda.min (Accuracy: 0.8198198):
+compute the final lasso model using lambda.min (Accuracy: 0.8359966):
 ```{r}
 # compute the final model using lambda.min:
 # Final model with lambda.min
@@ -932,13 +932,13 @@ mean(predicted.classes == observed.classes)
 table(predicted.classes, test.data$death)
 ```
 
-Lasso with lambda.min (AUC = 0.5729)
+Lasso with lambda.min (AUC = 0.8672)
 ```{r}
-roc_obj <- roc(test.data$death, predicted.classes)
+roc_obj <- roc(test.data$death, probabilities)
 auc(roc_obj)
 ```
 
-compute the final model using lambda.lse (Accuracy: 0.8098098):
+compute the final model using lambda.lse (Accuracy: 0.8301093):
 ```{r}
 # Final model with lambda.1se
 lasso.model <- glmnet(x, y, alpha = 1, family = "binomial",
@@ -955,9 +955,9 @@ mean(predicted.classes == observed.classes)
 table(predicted.classes, test.data$death)
 ```
 
-Lasso with lambda.lse (AUC = 0.531)
+Lasso with lambda.lse (AUC = 0.8654)
 ```{r}
-roc_obj <- roc(test.data$death, predicted.classes)
+roc_obj <- roc(test.data$death, probabilities)
 auc(roc_obj)
 ```
 
