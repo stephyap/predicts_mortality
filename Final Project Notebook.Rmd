@@ -41,6 +41,7 @@ install_load("knitr")
 install_load("skimr")
 install_load('e1071')
 install_load('ROCR')
+install_load('cvTools')
 ```
 
 ```{r message=FALSE}
@@ -500,23 +501,32 @@ save(var.sig, file = "var.sig.RData")
 
 #### 1. Logistic regression (without Dimension reduction)
 
-    First run accuracy = 81.0%
-    Using binary meds and procs, accurcy is 83.2%
+    AUC 0.8278275 
+    Prediction 0.8151466        
+    glm.pred   0   1
+            0 834 142
+            1  85 167
+    CV error: 0.1340
+
+
 
 ```{r}
+train <- train %>% filter(gender != "Unknown")
 #fit model on training data
 glm.fit=glm(death~., data=train, family=binomial)
+# k-fold cross validation
+cv.error=cv.glm(train,glm.fit,K=5)$delta[1]
+cv.error
 #get predictions on validation set
-glm.probs=predict(glm.fit, newdata=validation, type="response") 
+glm.probs=predict(glm.fit, newdata=validation, type="response", ) 
+roc_obj <- roc(validation$death, glm.probs)
+auc = auc(roc_obj)
+cat('AUC', auc, '\n')
 glm.pred=ifelse(glm.probs>0.5, 1, 0)
-val.accuracy = mean(glm.pred==validation$death)
-val.accuracy
+val.accuracy = mean(validation$death == glm.pred)
+cat('Prediction', val.accuracy)
 #confusion matrix
 table(glm.pred, validation$death)
-```
-
-
-```{r}
 # logistic regression summary
 summary(glm.fit)
 ```
@@ -528,45 +538,55 @@ summary(glm.fit)
 #renaming some column names
 # get names from var.sig in a list : dput(as.character(var.sig$names))
 
-edited_var <- c("141", "44", "norepinephrine", "age", "2549", "ondansetron", 
-"154650", "nimodipine", "122879", "2548", "any_vaso", "piperacillin-tazobactam", 
-"hydralazine", "heparin", "lidocaine", "ocular lubricant", "dopamine", 
+edited_var <- c("P141", "P44", "norepinephrine", "age", "P2549", "ondansetron", 
+"P154650", "nimodipine", "P122879", "P2548", "any_vaso", "piperacillin_tazobactam", 
+"hydralazine", "heparin", "lidocaine", "ocular_lubricant", "dopamine", 
 "fentanyl", "glucose", "n_vaso", "docusate", "labetalol", "etomidate", 
-"mannitol", "min_days_med_adm", "43", "4852", "codeine", "hydromorphone", 
-"sodium bicarbonate", "lvp solution with hypertonic saline", 
-"cefepime", "310", "4631", "3006", "lorazepam", "acetaminophen-oxycodone", 
-"chlorhexidine topical", "succinylcholine", "apap/butalbital/caffeine", 
-"161794", "161793", "min_days_pro_adm", "4756", "sterile water", 
-"albuterol-ipratropium", "ipratropium", "141780", "protamine", 
-"levofloxacin", "n_proc", "acetaminophen-hydrocodone", "levetiracetam", 
-"vancomycin", "metoclopramide", "potassium phosphate-sodium phosphate", 
+"mannitol", "min_days_med_adm", "P43", "P4852", "codeine", "hydromorphone", 
+"sodium_bicarbonate", "lvp_solution_with_hypertonic_saline", 
+"cefepime", "P310", "P4631", "P3006", "lorazepam", "acetaminophen_oxycodone", 
+"chlorhexidine_topical", "succinylcholine", "apap_butalbital_caffeine", 
+"P161794", "P161793", "min_days_pro_adm", "P4756", "sterile_water", 
+"albuterol_ipratropium", "ipratropium", "P141780", "protamine", 
+"levofloxacin", "n_proc", "acetaminophen_hydrocodone", "levetiracetam", 
+"vancomycin", "metoclopramide", "potassium_phosphate_sodium_phosphate", 
 "ceftriaxone", "promethazine", "nicardipine", "max_days_med_adm", 
-"337", "lvp solution with potassium", "lvp solution", "glucagon", 
-"vecuronium", "oxycodone", "2232", "glycopyrrolate", "dexamethasone", 
-"calcium chloride", "42", "sodium chloride", "diphenhydramine", 
-"propofol", "ketorolac", "157534", "magnesium sulfate", "phytonadione", 
-"acetaminophen", "digoxin", "neostigmine", "verapamil", "356", 
-"simvastatin", "ranitidine", "159871", "284", "albuterol", 
-"methylprednisolone", "pravastatin", "insulin regular", "midazolam", 
+"P337", "lvp_solution_with_potassium", "lvp_solution", "glucagon", 
+"vecuronium", "oxycodone", "P2232", "glycopyrrolate", "dexamethasone", 
+"calcium_chloride", "P42", "sodium_chloride", "diphenhydramine", 
+"propofol", "ketorolac", "P157534", "magnesium_sulfate", "phytonadione", 
+"acetaminophen", "digoxin", "neostigmine", "verapamil", "P356", 
+"simvastatin", "ranitidine", "P159871", "P284", "albuterol", 
+"methylprednisolone", "pravastatin", "insulin_regular", "midazolam", 
 "meperidine", "sugammadex", "morphine", "clindamycin", "senna", 
-"furosemide", "5097", "606", "2610", "aspirin", "phenytoin", 
-"remifentanil", "papaverine", "insulin aspart-insulin aspart protamine", 
-"90", "calcium carbonate", "hydrochlorothiazide", "clonidine", 
-"docusate-senna", "indocyanine green", "iopamidol", "155690", 
-"prochlorperazine", "157536", "acetaminophen-codeine", "nicotine", 
-"n_med", "calcium gluconate", "157076", "620", "race", "sufentanil", 
-"insulin lispro", "bisacodyl", "iodixanol", "eptifibatide", "losartan", 
-"159447", "zolpidem", "158020", "157074", "lisinopril", "110148", 
-"esmolol", "dolasetron", "al hydroxide/mg hydroxide/simethicone", 
-"gender", "84", "heparin flush", "fluticasone nasal", "amlodipine", 
-"98597", "cefazolin", "rosuvastatin", "lidocaine topical")
+"furosemide", "P5097", "P606", "P2610", "aspirin", "phenytoin", 
+"remifentanil", "papaverine", "insulin_aspart_insulin_aspart_protamine", 
+"P90", "calcium_carbonate", "hydrochlorothiazide", "clonidine", 
+"docusate_senna", "indocyanine_green", "iopamidol", "P155690", 
+"prochlorperazine", "P157536", "acetaminophen_codeine", "nicotine", 
+"n_med", "calcium_gluconate", "P157076", "P620", "race", "sufentanil", 
+"insulin_lispro", "bisacodyl", "iodixanol", "eptifibatide", "losartan", 
+"P159447", "zolpidem", "P158020", "P157074", "lisinopril", "P110148", 
+"esmolol", "dolasetron", "al_hydroxide_mg_hydroxide_simethicone", 
+"gender", "P84", "heparin_flush", "fluticasone_nasal", "amlodipine", 
+"P98597", "cefazolin", "rosuvastatin", "lidocaine_topical")
 ```
 
+Logistic regression with reduced variable set 1 (var.sig)
+
+    AUC 0.8452
+    Prediction 0.8249       
+    glm.pred   0   1
+            0 842 138
+            1  77 171
+    CV error: 0.1316
 ```{r}
 train.reduced <- train %>% select(edited_var,death)
 validation.reduced <- validation %>% select(edited_var,death)
 glm.fit_reduced=glm(death~., data=train.reduced, family=binomial)
-
+# k-fold cross validation
+cv.error=cv.glm(train,glm.fit_reduced,K=5)$delta[1]
+cv.error
 #get predictions on validation set
 glm.probs=predict(glm.fit_reduced, newdata=validation.reduced, type="response") 
 glm.pred=ifelse(glm.probs>0.5, 1, 0)
@@ -574,10 +594,13 @@ val.accuracy = mean(glm.pred==validation.reduced$death)
 val.accuracy
 #confusion matrix
 table(glm.pred, validation.reduced$death)
+# AUC
+roc_obj <- roc(validation.reduced$death, glm.probs)
+auc(roc_obj)
 ```
 
 ```{r}
-roc_obj <- roc(validation.reduced$death, glm.pred)
+roc_obj <- roc(validation.reduced$death, glm.probs)
 auc(roc_obj)
 ```
 
