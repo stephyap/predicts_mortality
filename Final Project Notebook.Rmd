@@ -505,29 +505,33 @@ save(var.sig, file = "var.sig.RData")
     glm.pred   0   1
             0 813 126
             1  79 171
-    CV error: 0.1340
 
+```{r message=FALSE}
+# simple logistic regression with 5-fold cross validation
+default_glm_mod=train(
+  form=death~.,
+  data=train,
+  trControl=trainControl(method="cv", number=5),
+  method="glm",
+  family='binomial'
+)
+# default_glm_mod
+# default_glm_mod$results
+# default_glm_mod$finalModel
+# summary(default_glm_mod) 
 
-
-```{r}
-# train <- train %>% filter(gender != "Unknown")
-#fit model on training data
-glm.fit=glm(death~., data=train, family=binomial)
-# k-fold cross validation
-cv.error=cv.glm(train,glm.fit,K=5)$delta[1]
-cv.error
-#get predictions on validation set
-glm.probs=predict(glm.fit, newdata=validation, type="response", ) 
+# AUC 
+glm.probs=predict(default_glm_mod, newdata=validation) ## probability
 roc_obj <- roc(validation$death, glm.probs)
 auc = auc(roc_obj)
-cat('AUC', auc, '\n')
+cat('AUC', auc)
+
+# Accuracy 
 glm.pred=ifelse(glm.probs>0.5, 1, 0)
 val.accuracy = mean(validation$death == glm.pred)
 cat('Prediction', val.accuracy)
 #confusion matrix
 table(glm.pred, validation$death)
-# logistic regression summary
-summary(glm.fit)
 ```
 
 
@@ -536,7 +540,6 @@ summary(glm.fit)
 ```{r}
 #renaming some column names
 # get names from var.sig in a list : dput(as.character(var.sig$names))
-
 edited_var <- c("P141", "P44", "norepinephrine", "age", "P2549", "ondansetron", 
 "P154650", "nimodipine", "P122879", "P2548", "any_vaso", "piperacillin_tazobactam", 
 "hydralazine", "heparin", "lidocaine", "ocular_lubricant", "dopamine", 
@@ -578,28 +581,35 @@ Logistic regression with reduced variable set 1 (var.sig)
     glm.pred   0   1
             0 826 132
             1  66 165
-    CV error: 0.1413
+
     
 ```{r}
-train.reduced <- train %>% select(edited_var,death)
-validation.reduced <- validation %>% select(edited_var,death)
-glm.fit_reduced=glm(death~., data=train.reduced, family=binomial)
-# k-fold cross validation
-cv.error=cv.glm(train,glm.fit_reduced,K=5)$delta[1]
-cv.error
-#get predictions on validation set
-glm.probs=predict(glm.fit_reduced, newdata=validation.reduced, type="response") 
+train.reduced_1 <- train %>% select(edited_var,death)
+validation.reduced_1 <- validation %>% select(edited_var,death)
+
+default_glm_mod_1=train(
+  form=death~.,
+  data=train.reduced_1,
+  trControl=trainControl(method="cv", number=5),
+  method="glm",
+  family='binomial'
+)
+
+# AUC 
+glm.probs=predict(default_glm_mod_1, newdata=validation.reduced_1) ## probability
+roc_obj <- roc(validation.reduced_1$death, glm.probs)
+auc = auc(roc_obj)
+cat('AUC', auc, '//')
+
+# Accuracy 
 glm.pred=ifelse(glm.probs>0.5, 1, 0)
-val.accuracy = mean(glm.pred==validation.reduced$death)
-val.accuracy
+val.accuracy = mean(validation.reduced_1$death == glm.pred)
+cat('Prediction', val.accuracy)
 #confusion matrix
-table(glm.pred, validation.reduced$death)
-# AUC
-roc_obj <- roc(validation.reduced$death, glm.probs)
-auc(roc_obj)
+table(glm.pred, validation.reduced_1$death)
 ```
 
-##### with reduced variables set 2 from forward.res.RData
+##### with reduced variables from forward.res.RData
 ```{r}
 red.var <- c("age", "P44", "P141", "P154650", "norepinephrine", "P2549", 
 "P2548", "P161794", "P161793", "P4852", "P43", "ocular_lubricant", 
@@ -621,22 +631,29 @@ red.var <- c("age", "P44", "P141", "P154650", "norepinephrine", "P2549",
     Area under the curve: 0.8747
     
 ```{r}
-train.reduced <- train %>% select(red.var,death)
-validation.reduced <- validation %>% select(red.var,death)
-glm.fit_reduced=glm(death~., data=train.reduced, family=binomial)
-# k-fold cross validation
-cv.error=cv.glm(train,glm.fit_reduced,K=5)$delta[1]
-cv.error
-#get predictions on validation set
-glm.probs=predict(glm.fit_reduced, newdata=validation.reduced, type="response") 
+train.reduced_2 <- train %>% select(red.var,death)
+validation.reduced_2 <- validation %>% select(red.var,death)
+
+default_glm_mod_2=train(
+  form=death~.,
+  data=train.reduced_2,
+  trControl=trainControl(method="cv", number=5),
+  method="glm",
+  family='binomial'
+)
+
+# AUC 
+glm.probs=predict(default_glm_mod_2, newdata=validation.reduced_2) ## probability
+roc_obj <- roc(validation.reduced_2$death, glm.probs)
+auc = auc(roc_obj)
+cat('AUC', auc, '//')
+
+# Accuracy 
 glm.pred=ifelse(glm.probs>0.5, 1, 0)
-val.accuracy = mean(glm.pred==validation.reduced$death)
-val.accuracy
+val.accuracy = mean(validation.reduced_2$death == glm.pred)
+cat('Prediction', val.accuracy)
 #confusion matrix
-table(glm.pred, validation.reduced$death)
-# AUC
-roc_obj <- roc(validation.reduced$death, glm.probs)
-auc(roc_obj)
+table(glm.pred, validation.reduced_2$death)
 ```
 
 #### 3. Gradient Boosting
@@ -907,10 +924,10 @@ fit the lasso penalized regression model
 ```{r}
 #fit the lasso penalized regression model
 set.seed(3) 
-cv.lasso <- cv.glmnet(x, y, alpha = 1, family = "binomial")
+cv.lasso <- cv.glmnet(x, y, alpha = 1, family = "binomial", nfolds=5)
 ```
 
-compute the final lasso model using lambda.min (Accuracy: 0.8198198):
+compute the final lasso model using lambda.min (Accuracy: 0.8359966):
 ```{r}
 # compute the final model using lambda.min:
 # Final model with lambda.min
@@ -931,13 +948,13 @@ mean(predicted.classes == observed.classes)
 table(predicted.classes, test.data$death)
 ```
 
-Lasso with lambda.min (AUC = 0.5729)
+Lasso with lambda.min (AUC = 0.8672)
 ```{r}
-roc_obj <- roc(test.data$death, predicted.classes)
+roc_obj <- roc(test.data$death, probabilities)
 auc(roc_obj)
 ```
 
-compute the final model using lambda.lse (Accuracy: 0.8098098):
+compute the final model using lambda.lse (Accuracy: 0.8301093):
 ```{r}
 # Final model with lambda.1se
 lasso.model <- glmnet(x, y, alpha = 1, family = "binomial",
@@ -954,9 +971,9 @@ mean(predicted.classes == observed.classes)
 table(predicted.classes, test.data$death)
 ```
 
-Lasso with lambda.lse (AUC = 0.531)
+Lasso with lambda.lse (AUC = 0.8654)
 ```{r}
-roc_obj <- roc(test.data$death, predicted.classes)
+roc_obj <- roc(test.data$death, probabilities)
 auc(roc_obj)
 ```
 
