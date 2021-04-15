@@ -9,9 +9,7 @@ prepData <- function(demo.path = "demo_train.csv",
                      med.path = "medication_train.csv", 
                      proc.path = "procedure_train.csv", 
                      keep.los = F, # whether to keep LOS variable in the data
-                     keep.id = F, # whether to keep patient_sk in the data
-                     med_freq_filter = med_freq_filter,
-                     proc_freq_filter = proc_freq_filter
+                     keep.id = F # whether to keep patient_sk in the data
                      ) {
   ## Read in data
   demo_df <- read.csv(demo.path, header = T)
@@ -71,8 +69,8 @@ prepData <- function(demo.path = "demo_train.csv",
   
   ## Modify levels in race and remove any observations with LOS < 3 days
   ## Treat "Unknown" in race and gender as missing values 
-  demo_df_new <- demo_df %>% #filter(gender != "Unknown", 
-                          #          race != "Unknown") %>%
+  demo_df_new <- demo_df %>% dplyr::filter(gender != "Unknown", 
+                                   race != "Unknown") %>%
     mutate(race = fct_recode(race, 
                              `Others` = 'Asian', 
                              `Others` = 'Pacific Islander', 
@@ -115,8 +113,11 @@ prepData <- function(demo.path = "demo_train.csv",
               procedure_description = first(procedure_description)) %>%
     arrange(desc(n)) 
   # filter to only medications with 50 or more patients
-  #med_freq_filter = filter(med_freq, n>50) #use for training data
-  med_freq_filter = med_freq_filter #use for test data
+  if ("death" %in% names(demo_df)) {
+    med_freq_filter = filter(med_freq, n>50) #use for training data
+  } else {
+    med_freq_filter = med_freq #use for test data, do not filter
+  }
   #remove cols from med df so we get one row per patient after pivoting
   med_df = subset(med_df, select=-c(admission_date, medication_date))
   # pivot med df to get one row per patient
@@ -142,8 +143,11 @@ prepData <- function(demo.path = "demo_train.csv",
   names(med_df_pivot_filter) <- new.names
   
   ## Pivot procedure variables
-  #proc_freq_filter = filter(proc_freq, n>50) 
-  proc_freq_filter = proc_freq_filter #use for test data
+  if ("death" %in% names(demo_df)) {
+    proc_freq_filter = filter(proc_freq, n>50)  #use for training data
+  } else {
+    proc_freq_filter = proc_freq #use for test data, do not filter
+  }
   proc_df = subset(proc_df, select=-c(procedure_description,admission_date, procedure_date))
   proc_df_pivot = proc_df %>% 
     group_by(patient_sk, procedure_id) %>%
@@ -191,19 +195,15 @@ test_df = prepData(demo.path = "demo_test.csv",
 med.path = "medication_test.csv", 
 proc.path = "procedure_test.csv", 
 keep.los = F, # whether to keep LOS variable in the data
-keep.id = T, # whether to keep patient_sk in the data
-med_freq_filter = med_freq_filter,
-proc_freq_filter = proc_freq_filter
+keep.id = T # whether to keep patient_sk in the data
 )
-save(test_df, file = "test_final.RData")
+save(test_df, file = "test_df.RData")
 
 
 train_final = prepData(demo.path = "demo_train.csv", 
                    med.path = "medication_train.csv", 
                    proc.path = "procedure_train.csv", 
                    keep.los = F, # whether to keep LOS variable in the data
-                   keep.id = F, # whether to keep patient_sk in the data
-                   med_freq_filter = med_freq_filter,
-                   proc_freq_filter = proc_freq_filter
+                   keep.id = F # whether to keep patient_sk in the data
 )
 save(train_final, file = "train_final.RData")
