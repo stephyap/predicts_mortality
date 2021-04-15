@@ -580,6 +580,7 @@ Logistic regression with reduced variable set 1 (var.sig)
             0 842 138
             1  77 171
     CV error: 0.1316
+    
 ```{r}
 train.reduced <- train %>% select(edited_var,death)
 validation.reduced <- validation %>% select(edited_var,death)
@@ -599,7 +600,79 @@ roc_obj <- roc(validation.reduced$death, glm.probs)
 auc(roc_obj)
 ```
 
+##### with reduced variables set 2 from forward.res.RData
 ```{r}
+red.var <- c("age", "P44", "P141", "P154650", "norepinephrine", "P2549", 
+"P2548", "P161794", "P161793", "P4852", "P43", "ocular_lubricant", 
+"mannitol", "propofol", "cefepime", "P157534", "lvp_solution", 
+"n_med", "piperacillin_tazobactam", "P310", "P337", "codeine", 
+"P620", "lvp_solution_with_hypertonic_saline", "sodium_bicarbonate", 
+"iopamidol", "apap_butalbital_caffeine", "calcium_carbonate", 
+"P4631", "P284", "sterile_water", "P157076", "iodixanol", "glucose", 
+"glucagon")
+```
+
+    Accuracy: 0.8110749
+            
+    glm.pred   0   1
+           0 840 153
+           1  79 156
+    Setting levels: control = 0, case = 1
+    Setting direction: controls < cases
+    Area under the curve: 0.8452
+    
+```{r}
+train.reduced <- train %>% select(red.var,death)
+validation.reduced <- validation %>% select(red.var,death)
+glm.fit_reduced=glm(death~., data=train.reduced, family=binomial)
+# k-fold cross validation
+cv.error=cv.glm(train,glm.fit_reduced,K=5)$delta[1]
+cv.error
+#get predictions on validation set
+glm.probs=predict(glm.fit_reduced, newdata=validation.reduced, type="response") 
+glm.pred=ifelse(glm.probs>0.5, 1, 0)
+val.accuracy = mean(glm.pred==validation.reduced$death)
+val.accuracy
+#confusion matrix
+table(glm.pred, validation.reduced$death)
+# AUC
+roc_obj <- roc(validation.reduced$death, glm.probs)
+auc(roc_obj)
+```
+
+
+##### with reduced variables set 3 from forward.res.RData
+```{r}
+red.var_3 <- c("age", "P44", "P154650", "P2549", "P2548", "P161794", "P161793", 
+"P4852", "ocular_lubricant", "mannitol", "cefepime", "lvp_solution", 
+"P337", "P620", "glucose")
+```
+
+    CV error rate 0.1362562
+    Accuracy 0.7890879
+            
+    glm.pred   0   1
+           0 830 170
+           1  89 139
+    Setting levels: control = 0, case = 1
+    Setting direction: controls < cases
+    Area under the curve: 0.8153
+    
+```{r}
+train.reduced <- train %>% select(red.var_3,death)
+validation.reduced <- validation %>% select(red.var_3,death)
+glm.fit_reduced=glm(death~., data=train.reduced, family=binomial)
+# k-fold cross validation
+cv.error=cv.glm(train,glm.fit_reduced,K=5)$delta[1]
+cv.error
+#get predictions on validation set
+glm.probs=predict(glm.fit_reduced, newdata=validation.reduced, type="response") 
+glm.pred=ifelse(glm.probs>0.5, 1, 0)
+val.accuracy = mean(glm.pred==validation.reduced$death)
+val.accuracy
+#confusion matrix
+table(glm.pred, validation.reduced$death)
+# AUC
 roc_obj <- roc(validation.reduced$death, glm.probs)
 auc(roc_obj)
 ```
