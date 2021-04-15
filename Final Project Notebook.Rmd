@@ -524,12 +524,12 @@ default_glm_mod=train(
 glm.probs=predict(default_glm_mod, newdata=validation) ## probability
 roc_obj <- roc(validation$death, glm.probs)
 auc = auc(roc_obj)
-cat('AUC', auc)
+cat('\n','AUC', auc, '\n')
 
 # Accuracy 
 glm.pred=ifelse(glm.probs>0.5, 1, 0)
 val.accuracy = mean(validation$death == glm.pred)
-cat('Prediction', val.accuracy)
+cat('Accuracy', val.accuracy)
 #confusion matrix
 table(glm.pred, validation$death)
 ```
@@ -599,12 +599,12 @@ default_glm_mod_1=train(
 glm.probs=predict(default_glm_mod_1, newdata=validation.reduced_1) ## probability
 roc_obj <- roc(validation.reduced_1$death, glm.probs)
 auc = auc(roc_obj)
-cat('AUC', auc, '//')
+cat('AUC', auc, '\n')
 
 # Accuracy 
 glm.pred=ifelse(glm.probs>0.5, 1, 0)
 val.accuracy = mean(validation.reduced_1$death == glm.pred)
-cat('Prediction', val.accuracy)
+cat('Accuracy', val.accuracy)
 #confusion matrix
 table(glm.pred, validation.reduced_1$death)
 ```
@@ -646,12 +646,12 @@ default_glm_mod_2=train(
 glm.probs=predict(default_glm_mod_2, newdata=validation.reduced_2) ## probability
 roc_obj <- roc(validation.reduced_2$death, glm.probs)
 auc = auc(roc_obj)
-cat('AUC', auc, '//')
+cat('AUC', auc, '\n')
 
 # Accuracy 
 glm.pred=ifelse(glm.probs>0.5, 1, 0)
 val.accuracy = mean(validation.reduced_2$death == glm.pred)
-cat('Prediction', val.accuracy)
+cat('Accuracy', val.accuracy)
 #confusion matrix
 table(glm.pred, validation.reduced_2$death)
 ```
@@ -916,6 +916,7 @@ test.data <- validation %>% relocate(death, .after=last_col())
 ```
 
 ```{r}
+# rearranging columns
 x <- model.matrix(death~., train.data)[,-1]
 y <- (train.data$death)
 ```
@@ -935,23 +936,17 @@ lasso.model <- glmnet(x, y, alpha = 1, family = "binomial",
                       lambda = cv.lasso$lambda.min)
 # Make prediction on test data
 x.test <- model.matrix(death ~., test.data)[,-1]
-```
 
-```{r}
 probabilities <- lasso.model %>% predict(newx = x.test, type="response")
 predicted.classes <- ifelse(probabilities > 0.5, 1, 0)
 # Model accuracy
 observed.classes <- test.data$death
 mean(predicted.classes == observed.classes) 
-```
-```{r}
 table(predicted.classes, test.data$death)
-```
-
-Lasso with lambda.min (AUC = 0.8672)
-```{r}
+# AUC
 roc_obj <- roc(test.data$death, probabilities)
-auc(roc_obj)
+auc = auc(roc_obj)
+cat('AUC with lambda.min', auc)
 ```
 
 compute the final model using lambda.lse (Accuracy: 0.8301093):
@@ -966,16 +961,13 @@ predicted.classes <- ifelse(probabilities > 0.5, 1, 0)
 # Model accuracy rate
 observed.classes <- test.data$death
 mean(predicted.classes == observed.classes)
-```
-```{r}
 table(predicted.classes, test.data$death)
+# AUC
+roc_obj <- roc(test.data$death, probabilities)
+auc = auc(roc_obj)
+cat('AUC with lambda.lse', auc)
 ```
 
-Lasso with lambda.lse (AUC = 0.8654)
-```{r}
-roc_obj <- roc(test.data$death, probabilities)
-auc(roc_obj)
-```
 
 #### 6. Super Learner
 Individual model for glm
