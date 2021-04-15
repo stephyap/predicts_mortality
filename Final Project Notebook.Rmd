@@ -501,17 +501,17 @@ save(var.sig, file = "var.sig.RData")
 
 #### 1. Logistic regression (without Dimension reduction)
 
-    AUC 0.8278275 
-    Prediction 0.8151466        
+    AUC 0.8612885 
+    Prediction 0.8275862        
     glm.pred   0   1
-            0 834 142
-            1  85 167
+            0 813 126
+            1  79 171
     CV error: 0.1340
 
 
 
 ```{r}
-train <- train %>% filter(gender != "Unknown")
+# train <- train %>% filter(gender != "Unknown")
 #fit model on training data
 glm.fit=glm(death~., data=train, family=binomial)
 # k-fold cross validation
@@ -574,12 +574,12 @@ edited_var <- c("P141", "P44", "norepinephrine", "age", "P2549", "ondansetron",
 
 Logistic regression with reduced variable set 1 (var.sig)
 
-    AUC 0.8452
-    Prediction 0.8249       
+    AUC 0.8658
+    Prediction 0.8334735       
     glm.pred   0   1
-            0 842 138
-            1  77 171
-    CV error: 0.1316
+            0 826 132
+            1  66 165
+    CV error: 0.1413
     
 ```{r}
 train.reduced <- train %>% select(edited_var,death)
@@ -612,55 +612,18 @@ red.var <- c("age", "P44", "P141", "P154650", "norepinephrine", "P2549",
 "glucagon")
 ```
 
-    Accuracy: 0.8110749
+    Accuracy: 0.84020
             
     glm.pred   0   1
-           0 840 153
-           1  79 156
+           0 836 143
+           1  56 163
     Setting levels: control = 0, case = 1
     Setting direction: controls < cases
-    Area under the curve: 0.8452
+    Area under the curve: 0.8747
     
 ```{r}
 train.reduced <- train %>% select(red.var,death)
 validation.reduced <- validation %>% select(red.var,death)
-glm.fit_reduced=glm(death~., data=train.reduced, family=binomial)
-# k-fold cross validation
-cv.error=cv.glm(train,glm.fit_reduced,K=5)$delta[1]
-cv.error
-#get predictions on validation set
-glm.probs=predict(glm.fit_reduced, newdata=validation.reduced, type="response") 
-glm.pred=ifelse(glm.probs>0.5, 1, 0)
-val.accuracy = mean(glm.pred==validation.reduced$death)
-val.accuracy
-#confusion matrix
-table(glm.pred, validation.reduced$death)
-# AUC
-roc_obj <- roc(validation.reduced$death, glm.probs)
-auc(roc_obj)
-```
-
-
-##### with reduced variables set 3 from forward.res.RData
-```{r}
-red.var_3 <- c("age", "P44", "P154650", "P2549", "P2548", "P161794", "P161793", 
-"P4852", "ocular_lubricant", "mannitol", "cefepime", "lvp_solution", 
-"P337", "P620", "glucose")
-```
-
-    CV error rate 0.1362562
-    Accuracy 0.7890879
-            
-    glm.pred   0   1
-           0 830 170
-           1  89 139
-    Setting levels: control = 0, case = 1
-    Setting direction: controls < cases
-    Area under the curve: 0.8153
-    
-```{r}
-train.reduced <- train %>% select(red.var_3,death)
-validation.reduced <- validation %>% select(red.var_3,death)
 glm.fit_reduced=glm(death~., data=train.reduced, family=binomial)
 # k-fold cross validation
 cv.error=cv.glm(train,glm.fit_reduced,K=5)$delta[1]
