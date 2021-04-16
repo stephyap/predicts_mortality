@@ -1237,11 +1237,11 @@ table(boost.pred, train_final$death)
 pROC::auc(roc(labels,boost.probs))
 #make predictions on test set using full boost model
 boost.test.probs = predict(boost.test, test_df[,c(-1)], n.trees = 1000, type='response')
-
+boost.test.outcomes=ifelse(boost.test.probs>0.5, TRUE, FALSE)
 #make final df with patient id and prediction
-final_preds = data.frame(patient_id = test_df[,c(1)], boost.pred = boost.test.probs)
+final_preds = data.frame(patient_id = test_df[,c(1)], boost.pred= boost.test.probs, mortality.pred = boost.test.outcomes)
 #write to csv
-write.csv(final_preds,'/Users/Brian/Dropbox/UTHealth/PH 1976/predicts_mortality/final_preds2.csv', row.names = FALSE)
+write.csv(final_preds,'final_preds.csv', row.names = FALSE)
 ```
 
 
