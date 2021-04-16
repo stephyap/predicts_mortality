@@ -967,7 +967,7 @@ Note that CV is used for building the model for the training data.
 # linear
 # single
 
-svm.linear <- svm(death ~ ., data = train_final, kernel = "linear", cost = 1,decision.values=T, probability =T)
+svm.linear <- svm(death ~ ., data = train, kernel = "linear", cost = 1,decision.values=T, probability =T)
 
 
 pred <- predict(svm.linear, train, decision.values = TRUE)
@@ -987,7 +987,7 @@ accuracy <- (confusion[1,1] + confusion[2,2])/sum(confusion)
 install_load('ROCR')
 
 rocplot=function(pred, truth, ...){
- predob = prediction(pred, truth, c(1,0))
+ predob = prediction(pred, truth, c(0,1))
  perf = performance(predob, "tpr", "fpr")
  auc = performance(predob, 'auc')
  
@@ -1029,9 +1029,6 @@ TNR
 ```
 
 
-
-
-
 ```{r, eval=F}
 # tune
 set.seed(12)
@@ -1047,10 +1044,8 @@ save(linear.out2,file = "SVM_linear2.Rdata")
 summary(linear.out2)
 
 
+
 ```
-
-
-
 
 ```{r}
 # polynomial
@@ -1079,7 +1074,7 @@ accuracy <- (confusion[1,1] + confusion[2,2])/sum(confusion)
 install_load('ROCR')
 
 rocplot=function(pred, truth, ...){
- predob = prediction(pred, truth, c(1,0))
+ predob = prediction(pred, truth, c(0,1))
  perf = performance(predob, "tpr", "fpr")
  auc = performance(predob, 'auc')
  
@@ -1159,7 +1154,7 @@ accuracy <- (confusion[1,1] + confusion[2,2])/sum(confusion)
 install_load('ROCR')
 
 rocplot=function(pred, truth, ...){
- predob = prediction(pred, truth, c(1,0))
+ predob = prediction(pred, truth, c(0,1))
  perf = performance(predob, "tpr", "fpr")
  auc = performance(predob, 'auc')
  
