@@ -848,7 +848,10 @@ fit the lasso penalized regression model
 #fit the lasso penalized regression model
 set.seed(3) 
 cv.lasso <- cv.glmnet(x, y, alpha = 1, family = "binomial", nfolds=5)
+cat('Lambda.1se: ', cv.lasso$lambda.1se, '\n')
+cat('Lambda.min: ', cv.lasso$lambda.min)
 ```
+
 
 compute the final lasso model using lambda.min (Accuracy: 0.8359966):
 ```{r}
