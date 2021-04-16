@@ -938,7 +938,7 @@ auc = ROCR::performance(pred_rocr, measure = "auc", x.measure = "cutoff")@y.valu
 auc
 ```
 
-#### 6. SVM
+#### 7. SVM
 
 a.	Data preparation
 We split the data into training and validation sets.
@@ -1131,10 +1131,9 @@ save(poly.tune.out,file = "SVM_polynomial.Rdata")
 
 # radial:
 # single
+# 10 fold CV error from on the training data: 0.1795731
 
-# 10 fold CV error from on the training data: 0.1894415
-
-svm.radial <- svm(death ~ ., data = train,kernel = "radial", cost = 10, gamma = 0.001)
+svm.radial <- svm(death ~ ., data = train,kernel = "radial", cost = 5, gamma = 0.001)
 #svm.radial
 
 pred <- predict(svm.radial, train, decision.values = TRUE)
