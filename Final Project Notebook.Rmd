@@ -967,7 +967,9 @@ Note that CV is used for building the model for the training data.
 # linear
 # single
 
-svm.linear <- svm(death ~ ., data = train, kernel = "linear", cost = 1,decision.values=T, probability =T)
+# 10 fold CV results: best performance: 0.1790113 
+
+svm.linear <- svm(death ~ ., data = train, kernel = "linear", cost = 0.01,decision.values=T, probability =T)
 
 
 pred <- predict(svm.linear, train, decision.values = TRUE)
