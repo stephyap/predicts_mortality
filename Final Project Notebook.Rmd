@@ -938,6 +938,94 @@ auc = ROCR::performance(pred_rocr, measure = "auc", x.measure = "cutoff")@y.valu
 auc
 ```
 
+
+Ensembling models
+```{r}
+# Create a new function that changes just the ntree argument.
+# (We could do this in a single line.)
+# "..." means "all other arguments that were sent to the function"
+# SL.rf.better = function(...) {
+#   SL.ranger(..., num.trees = 1000, mtry = 3)
+# }
+
+SL.rf.better = function(...) {
+  SL.randomForest(..., num.trees = 500, mtry = 6)
+}
+
+SL.xgb.better = function(...) {
+  SL.xgboost(..., n.trees = 1000, max_depth = 4, eta = 0.01, subsample = 0.5)
+}
+
+SL.gbm.better = function(...) {
+  SL.gbm(..., n.trees = 1000, max_depth = 4, eta = 0.01, subsample = 0.5)
+}
+
+# SL.xgb.better2 = function(...) {
+#   SL.xgboost(..., n.trees = 1000, max_depth = 2, shrinkage = 0.01, subsample = 1)
+# }
+
+SL.glmnet.better = function(...) {
+  SL.glmnet(..., alpha = 0.4)
+}
+
+SL.ksvm.better = function(...) {
+  SL.ksvm(..., type = "C-svc", # classification
+          kernel = "rbfdot", # linear kernel
+          C = 5, # cost = 1
+          kpar = list(sigma = 0.001)
+          )
+}
+```
+
+```{r}
+cv.sl.all1 = CV.SuperLearner(Y = y.train, X = x.train.full, 
+                            family = binomial(),
+                          V = 5,
+                          method = "method.AUC",
+                          SL.library = c("SL.glmnet.better", 
+                                         "SL.rf.better", 
+                                         "SL.xgb.better", 
+                                         "SL.ksvm.better"
+                                         ))
+save(cv.sl.all1, file = "cv.sl.all1.RData")
+```
+
+```{r}
+sl.all1.pred = predict(sl.all1, x.valid.full, onlySL = F)
+str(sl.all1.pred)
+```
+
+```{r fig.height=4, fig.width=4}
+sl.en.roc <- rocit(score = sl.all1.pred$library.predict[,1], class = y.valid)
+sl.rf.roc <- rocit(score = sl.all1.pred$library.predict[,2], class = y.valid)
+sl.xgb.roc <- rocit(score = sl.all1.pred$library.predict[,3], class = y.valid)
+sl.svm.roc <- rocit(score = sl.all1.pred$library.predict[,4], class = y.valid)
+sl.roc <- rocit(score = sl.all1.pred$pred[,1], class = y.valid)
+```
+
+```{r}
+# colors = c('#66c2a5','#fc8d62','#8da0cb','#e78ac3')
+png("sl_roc_plot_v2.png", height = 600, width = 600)
+colors = c('#1f78b4','#33a02c','#e31a1c','#ff7f00','#6a3d9a')
+plot(sl.en.roc, values = T, YIndex = F, legend = F, col = colors[1], lwd = 1.5)
+par(new = T)
+plot(sl.rf.roc, values = T, YIndex = F, legend = F, col = colors[2], 
+     xaxt = "n", yaxt = "n", xlab = "", ylab = "", lwd = 1.5)
+par(new = T)
+plot(sl.xgb.roc, values = T, YIndex = F, legend = F, col = colors[3], 
+     xaxt = "n", yaxt = "n", xlab = "", ylab = "", lwd = 1.5)
+par(new = T)
+plot(sl.svm.roc, values = T, YIndex = F, legend = F, col = c(colors[4]), 
+     xaxt = "n", yaxt = "n", xlab = "", ylab = "", lwd = 1.5)
+par(new = T)
+plot(sl.roc, values = T, YIndex = F, legend = F, col = c(colors[5], "#BEBEBE"), 
+     xaxt = "n", yaxt = "n", xlab = "", ylab = "", lwd = 1.5)
+all.auc = round(c(sl.en.roc$AUC, sl.rf.roc$AUC, sl.xgb.roc$AUC, sl.svm.roc$AUC, sl.roc$AUC),3)
+legend("bottomright", legend = paste0(c("EN", "RF", "XGB", "SVM", "SL"), " AUC = ", all.auc), col = colors, lwd = 2, cex = 2, 
+       bty = "n")
+dev.off()
+```
+
 #### 7. SVM
 
 a.	Data preparation
@@ -1220,6 +1308,52 @@ save(radial.tune.out3,file = "SVM_radial3.Rdata")
 
 ```
 
+
+### 8. Elastic Net
+
+```{r}
+# Make a custom tuning grid
+tuneGrid <- expand.grid(alpha = seq(0, 1, 0.1), 
+                        lambda = c(0.001, 0.01, 0.1, 0.5, 1))
+
+ # Create trainControl object: myControl
+myControl <- trainControl(
+  method = "cv",
+  number = 5,
+  # repeats = 5,
+  summaryFunction = twoClassSummary,
+  classProbs = TRUE # IMPORTANT!
+  # verboseIter = TRUE
+)
+
+# Fit a model
+train.full$death <- as.factor(train.full$death)
+levels(train.full$death) <- c("No", "Yes")
+glmnet.cv1 <- train(death ~ ., train.full, method = "glmnet",
+  tuneGrid = tuneGrid, trControl = myControl
+)
+
+```
+
+```{r}
+# glmnet.cv1
+glmnet.cv1$bestTune
+save(glmnet.cv1, file = "glmnet.cv1.RData")
+```
+
+```{r}
+glmnet.fit <- glmnet(x.train.full, y.train, family = "binomial", 
+                     alpha = 0.4, lambda = 0.01)
+glmnet.pred <- predict(glmnet.fit, newx = x.valid.full, s = 0.01, type = "response")
+```
+
+
+```{r fig.height=4, fig.width=4}
+glmnet.roc <- rocit(score = glmnet.pred[,1], class = y.valid)
+plot(glmnet.roc, values = T, YIndex = F, legend = F)
+legend("bottomright", legend = paste0("AUC = ", round(glmnet.roc$AUC, 3)), 
+       bty = "n")
+```
 
 ### Get final test set predictions
 ```{r}
