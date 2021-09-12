@@ -1,10 +1,10 @@
 # Predicting Mortality for Subarachnoid Hemorrhage Patients
 
-### Authors: Brian Bacik, Chiu-Feng Yap, Joy Yoo, Yi Yao, Yun Qing
+#### Authors: Brian Bacik, Chiu-Feng Yap, Joy Yoo, Yi Yao, Yun Qing
 
-### -- Project Status: [Completed]
+#### -- Project Status: [Completed]
 
-### -- Project Ranking: 3/15
+#### -- Project Ranking: 3/15
 
 # Introducction
 
@@ -40,5 +40,5 @@ The objective of this project is to predict the risk of the adverse outcome for 
 |Lasso (Lambda.1se)	| 0.865| 	0.830| 	0.751| 	0.845| 
 |Elastic Net |	0.846	| 0.825| 	0.533| 	0.924| 
 |SVM (radial kernel)	| 0.865| 	0.842| 	0.569| 	0.933| 
-|Super Learner	| 0.850	| 0.823	0.500| 	0.932| 
+|Super Learner	| 0.850	| 0.823	| 0.500| 	0.932| 
 
