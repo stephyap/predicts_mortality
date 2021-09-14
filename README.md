@@ -6,7 +6,7 @@
 
 #### -- Project Ranking: 3/15
 
-# Introducction
+# Introduction
 
 Subarachnoid Hemorrhage (SAH) is a type of stroke that commonly affects individuals who had head traumas. Among individuals without head trauma, SAH is most commonly caused by a brain ruptured aneurysm. SAH is life-threatening and can reduce the quality of years of individuals who survive. The main treatment for patients with SAH is not limited to IV fluid, but vasopressors, such as dopamine, phenylephrine, and norepinephrine that help patients with SAH to elevate their blood pressures. Patients who have three of these vasopressors as their treatment are considered more severe cases and that makes up to almost 10% of patients with SAH. Unfortunately, there are no standardized guidelines for distinguishing these patients.
 
